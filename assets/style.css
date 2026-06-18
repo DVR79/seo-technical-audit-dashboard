@@ -369,3 +369,22 @@ button:focus-visible,
     outline-offset: 2px;
     border-radius: 4px;
 }
+
+/* ── KPI card buttons (Link Analysis overview) ───────────────── */
+/* Make the Streamlit button under each KPI card look like a subtle
+   "click to filter" affordance, not a full-width primary button    */
+[data-testid="stButton"] button[kind="secondary"][id*="la_btn_"] {
+    background: transparent !important;
+    border: none !important;
+    color: #94A3B8 !important;
+    font-size: .65rem !important;
+    padding: 2px 0 !important;
+    margin-top: -6px !important;
+    box-shadow: none !important;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+[data-testid="stButton"] button[kind="secondary"][id*="la_btn_"]:hover {
+    color: #3B82F6 !important;
+    background: transparent !important;
+}

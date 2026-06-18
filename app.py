@@ -2165,49 +2165,97 @@ def page_link_analysis():
     ])
 
     # ════════════════════════ TAB 1: OVERVIEW ═══════════════════════════ #
+
+    # Filter state for clickable KPI cards
+    if "la_ov_filter" not in st.session_state:
+        st.session_state["la_ov_filter"] = None   # (kind, filter_key)
+
+    def _kpi_card_btn(col, label, val, clr, fkind, fkey):
+        """Render a clickable KPI card. Sets session_state filter on click."""
+        active = st.session_state.get("la_ov_filter") == (fkind, fkey)
+        border = f"2px solid {clr}" if active else "1px solid var(--seo-border,rgba(148,163,184,.22))"
+        shadow = f"0 0 0 2px {clr}44" if active else "none"
+        with col:
+            st.markdown(f"""
+            <div style='background:var(--seo-card-bg,#fff);border:{border};box-shadow:{shadow};
+                 border-radius:10px;padding:10px;text-align:center;cursor:pointer'>
+                <div style='font-size:1.4rem;font-weight:800;color:{clr}'>{val}</div>
+                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{label}</div>
+            </div>""", unsafe_allow_html=True)
+            if st.button(f"↓ {label}", key=f"la_btn_{fkind}_{fkey}", use_container_width=True,
+                         help=f"Click to filter links by: {label}"):
+                if st.session_state.get("la_ov_filter") == (fkind, fkey):
+                    st.session_state["la_ov_filter"] = None   # toggle off
+                else:
+                    st.session_state["la_ov_filter"] = (fkind, fkey)
+                st.rerun()
+
     with tab_ov:
         st.markdown('<div class="section-header">🔵 Internal Links Summary</div>', unsafe_allow_html=True)
         ic = st.columns(8)
         _kv = [
-            ("Total",      i_total,   "#3B82F6"),
-            ("Unique URLs",i_unique,  "#6366F1"),
-            ("Dofollow",   i_df,      "#10B981"),
-            ("Nofollow",   i_nf,      "#F59E0B"),
-            ("Broken",     i_broken,  "#EF4444"),
-            ("Redirecting",i_redir,   "#F97316"),
-            ("New Tab",    i_new_tab, "#8B5CF6"),
-            ("Weak Anchor",i_weak,    "#F59E0B"),
+            ("Total",      i_total,   "#3B82F6", "int", "all"),
+            ("Unique URLs",i_unique,  "#6366F1", "int", "unique"),
+            ("Dofollow",   i_df,      "#10B981", "int", "dofollow"),
+            ("Nofollow",   i_nf,      "#F59E0B", "int", "nofollow"),
+            ("Broken",     i_broken,  "#EF4444", "int", "broken"),
+            ("Redirecting",i_redir,   "#F97316", "int", "redirect"),
+            ("New Tab",    i_new_tab, "#8B5CF6", "int", "new_tab"),
+            ("Weak Anchor",i_weak,    "#F59E0B", "int", "weak"),
         ]
-        for col, (label, val, clr) in zip(ic, _kv):
-            with col:
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-radius:10px;padding:10px;text-align:center'>
-                    <div style='font-size:1.4rem;font-weight:800;color:{clr}'>{val}</div>
-                    <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{label}</div>
-                </div>""", unsafe_allow_html=True)
+        for col, (label, val, clr, fkind, fkey) in zip(ic, _kv):
+            _kpi_card_btn(col, label, val, clr, fkind, fkey)
 
         st.markdown('<div class="section-header" style="margin-top:20px">🟣 External Links Summary</div>',
                     unsafe_allow_html=True)
         ec = st.columns(8)
         _kv_e = [
-            ("Total",      e_total,   "#7C3AED"),
-            ("Domains",    e_unique,  "#6366F1"),
-            ("Dofollow",   e_df,      "#10B981"),
-            ("Nofollow",   e_nf,      "#F59E0B"),
-            ("Broken",     e_broken,  "#EF4444"),
-            ("Blocked",    e_blocked, "#8B5CF6"),
-            ("No Security",e_no_sec,  "#F97316"),
-            ("Weak Anchor",e_weak,    "#F59E0B"),
+            ("Total",      e_total,   "#7C3AED", "ext", "all"),
+            ("Domains",    e_unique,  "#6366F1", "ext", "unique"),
+            ("Dofollow",   e_df,      "#10B981", "ext", "dofollow"),
+            ("Nofollow",   e_nf,      "#F59E0B", "ext", "nofollow"),
+            ("Broken",     e_broken,  "#EF4444", "ext", "broken"),
+            ("Blocked",    e_blocked, "#8B5CF6", "ext", "blocked"),
+            ("No Security",e_no_sec,  "#F97316", "ext", "no_security"),
+            ("Weak Anchor",e_weak,    "#F59E0B", "ext", "weak"),
         ]
-        for col, (label, val, clr) in zip(ec, _kv_e):
-            with col:
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-radius:10px;padding:10px;text-align:center'>
-                    <div style='font-size:1.4rem;font-weight:800;color:{clr}'>{val}</div>
-                    <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{label}</div>
-                </div>""", unsafe_allow_html=True)
+        for col, (label, val, clr, fkind, fkey) in zip(ec, _kv_e):
+            _kpi_card_btn(col, label, val, clr, fkind, fkey)
+
+        # ── Filtered link table driven by card clicks ─────────────────────
+        ov_filter = st.session_state.get("la_ov_filter")
+        if ov_filter:
+            fkind, fkey = ov_filter
+            src_links = all_int_links if fkind == "int" else all_ext_links
+            label_map = {
+                "all":       ("All Links",          src_links),
+                "unique":    ("Unique URLs",         list({l["url"]: l for l in src_links}.values())),
+                "dofollow":  ("Dofollow Links",      [l for l in src_links if l.get("is_dofollow")]),
+                "nofollow":  ("Nofollow Links",      [l for l in src_links if l.get("is_nofollow")]),
+                "broken":    ("Broken Links",        [l for l in src_links if l.get("health") == "broken"]),
+                "redirect":  ("Redirecting Links",   [l for l in src_links if l.get("health") == "redirect"]),
+                "blocked":   ("Blocked Links",       [l for l in src_links if l.get("health") == "blocked"]),
+                "new_tab":   ("New Tab Links",       [l for l in src_links if l.get("opens_new_tab")]),
+                "no_security":("No Noopener Links",  [l for l in src_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+                "weak":      ("Weak Anchor Links",   [l for l in src_links if not (l.get("anchor_text") or "").strip() or len((l.get("anchor_text") or "").split()) < 2]),
+            }
+            section_label, filtered_links = label_map.get(fkey, ("Links", src_links))
+            kind_label = "Internal" if fkind == "int" else "External"
+            st.markdown("---")
+            st.markdown(
+                f"<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>"
+                f"<span style='font-size:1rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
+                f"{'🔵' if fkind=='int' else '🟣'} {kind_label}: {section_label}</span>"
+                f"<span style='background:#F1F5F9;color:#475569;padding:2px 8px;border-radius:12px;"
+                f"font-size:.75rem;font-weight:600'>{len(filtered_links)} links</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+            if filtered_links:
+                render_link_table(filtered_links, show_source=True, source_label="Source Page",
+                                  max_rows=300, key_prefix=f"la_ov_{fkind}_{fkey}")
+            else:
+                st.info(f"No {section_label.lower()} found.")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
