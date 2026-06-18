@@ -315,6 +315,267 @@ def page_dashboard():
         st.plotly_chart(fig5, use_container_width=True)
 
 
+def _render_inline_result(r):
+    """Render a full single-URL audit result inline on the New Audit page."""
+    score = r.get("seo_score", 0)
+    issues = r.get("all_issues", [])
+    meta = r.get("metadata", {})
+    head = r.get("headings", {})
+    cont = r.get("content", {})
+    imgs = r.get("images", {})
+    can  = r.get("canonical", {})
+    idx_data = r.get("indexability", {})
+    il   = r.get("internal_links", {})
+    el   = r.get("external_links", {})
+    atype = r.get("audit_type", "general")
+
+    st.markdown("---")
+
+    # ── Score banner ──────────────────────────────────────────────────────
+    color = _score_color(score)
+    label = _score_label(score)
+    critical_n = sum(1 for i in issues if i.get("severity") == "Critical")
+    high_n     = sum(1 for i in issues if i.get("severity") == "High")
+
+    st.markdown(
+        f"""
+        <div style='background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;
+        padding:20px 28px;margin-bottom:18px;display:flex;align-items:center;gap:32px'>
+            <div style='text-align:center;min-width:90px'>
+                <div style='font-size:3rem;font-weight:800;color:{color};line-height:1'>{score}</div>
+                <div style='font-size:.78rem;color:#94A3B8;margin-top:2px'>SEO Score / 100</div>
+                <div style='margin-top:6px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
+            </div>
+            <div style='flex:1'>
+                <div style='font-size:1rem;font-weight:700;color:#F1F5F9;margin-bottom:6px'>
+                    {r.get("url","")[:90]}
+                </div>
+                <div style='font-size:.82rem;color:#94A3B8'>
+                    Type: <b style='color:#CBD5E1'>{atype.title()}</b> &nbsp;|&nbsp;
+                    HTTP: <b style='color:#CBD5E1'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
+                    Response: <b style='color:#CBD5E1'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
+                    Redirects: <b style='color:#CBD5E1'>{r.get("redirect_count",0)}</b>
+                </div>
+                <div style='margin-top:10px;display:flex;gap:16px;flex-wrap:wrap'>
+                    <span style='background:#1E3A5F;color:#93C5FD;padding:4px 12px;border-radius:8px;font-size:.8rem'>
+                        Total Issues: <b>{len(issues)}</b>
+                    </span>
+                    <span style='background:#450A0A;color:#FCA5A5;padding:4px 12px;border-radius:8px;font-size:.8rem'>
+                        Critical: <b>{critical_n}</b>
+                    </span>
+                    <span style='background:#431407;color:#FDBA74;padding:4px 12px;border-radius:8px;font-size:.8rem'>
+                        High: <b>{high_n}</b>
+                    </span>
+                    <span style='background:#052E16;color:#86EFAC;padding:4px 12px;border-radius:8px;font-size:.8rem'>
+                        Word Count: <b>{cont.get("word_count",0):,}</b>
+                    </span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── KPI row ───────────────────────────────────────────────────────────
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1.metric("H1 Tags",       head.get("h1_count", 0))
+    k2.metric("H2 Tags",       head.get("h2_count", 0))
+    k3.metric("Images",        imgs.get("total_images", 0))
+    k4.metric("Missing Alt",   imgs.get("missing_alt_count", 0))
+    k5.metric("Int. Links",    il.get("total_links", 0))
+    k6.metric("Ext. Links",    el.get("total_links", 0))
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Two-column detail + score breakdown ───────────────────────────────
+    left, right = st.columns([3, 2])
+
+    with left:
+        # Metadata
+        st.markdown('<div class="section-header">📋 Metadata</div>', unsafe_allow_html=True)
+        m1, m2 = st.columns(2)
+        with m1:
+            ok = "✅" if meta.get("has_title") else "❌"
+            length = meta.get("title_length", 0)
+            status = "OK" if 30 <= length <= 60 else ("Too Short" if length < 30 else "Too Long")
+            st.markdown(f"**{ok} Meta Title** `{length} chars — {status}`")
+            st.code(meta.get("title", "—") or "—", language=None)
+        with m2:
+            ok = "✅" if meta.get("has_description") else "❌"
+            length = meta.get("description_length", 0)
+            status = "OK" if 120 <= length <= 160 else ("Too Short" if length < 120 else "Too Long")
+            st.markdown(f"**{ok} Meta Description** `{length} chars — {status}`")
+            desc = meta.get("description", "") or "—"
+            st.code(desc[:120] + ("…" if len(desc) > 120 else ""), language=None)
+
+        og_ok = "✅" if meta.get("has_og_tags") else "❌"
+        img_ok = "✅" if meta.get("has_og_image") else "❌"
+        idx_ok = "✅" if idx_data.get("is_indexable", True) else "🔴 NOINDEX"
+        can_ok = "✅" if can.get("is_self_referencing") else ("⚠️" if can.get("canonical_url") else "❌")
+        st.caption(
+            f"OG Tags: {og_ok}  |  OG Image: {img_ok}  |  "
+            f"Indexable: {idx_ok}  |  Canonical: {can_ok}"
+        )
+
+        # Content
+        st.markdown('<div class="section-header">📝 Content Quality</div>', unsafe_allow_html=True)
+        wc = cont.get("word_count", 0)
+        rt = cont.get("reading_time", 0)
+        cr = cont.get("content_ratio", 0)
+        thin = cont.get("is_thin", False)
+        wc_color = "#EF4444" if thin else ("#F59E0B" if wc < 600 else "#10B981")
+        st.markdown(
+            f"""
+            <div style='display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px'>
+                <div style='background:#F8FAFC;border-radius:8px;padding:10px 16px;text-align:center;min-width:100px'>
+                    <div style='font-size:1.4rem;font-weight:700;color:{wc_color}'>{wc:,}</div>
+                    <div style='font-size:.72rem;color:#64748B'>Words</div>
+                </div>
+                <div style='background:#F8FAFC;border-radius:8px;padding:10px 16px;text-align:center;min-width:100px'>
+                    <div style='font-size:1.4rem;font-weight:700;color:#3B82F6'>{rt}</div>
+                    <div style='font-size:.72rem;color:#64748B'>Min Read</div>
+                </div>
+                <div style='background:#F8FAFC;border-radius:8px;padding:10px 16px;text-align:center;min-width:100px'>
+                    <div style='font-size:1.4rem;font-weight:700;color:#6366F1'>{cr}%</div>
+                    <div style='font-size:.72rem;color:#64748B'>Content Ratio</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Links summary
+        st.markdown('<div class="section-header">🔗 Link Summary</div>', unsafe_allow_html=True)
+        lc1, lc2 = st.columns(2)
+        with lc1:
+            st.markdown("**Internal Links**")
+            st.caption(
+                f"Total: {il.get('total_links',0)} | "
+                f"Unique: {il.get('unique_links',0)} | "
+                f"Dofollow: {il.get('dofollow_count',0)} | "
+                f"Nofollow: {il.get('nofollow_count',0)}"
+            )
+            broken_i = il.get("broken_count", 0)
+            if broken_i:
+                st.error(f"🔴 {broken_i} broken internal link(s)")
+            else:
+                st.success("✅ No broken internal links")
+        with lc2:
+            st.markdown("**External Links**")
+            st.caption(
+                f"Total: {el.get('total_links',0)} | "
+                f"Domains: {el.get('unique_domains',0)} | "
+                f"Dofollow: {el.get('dofollow_count',0)} | "
+                f"Nofollow: {el.get('nofollow_count',0)}"
+            )
+            broken_e = el.get("broken_count", 0)
+            if broken_e:
+                st.error(f"🔴 {broken_e} broken external link(s)")
+            else:
+                st.success("✅ No broken external links")
+
+        # Course / Blog specific
+        if atype == "course":
+            ca = r.get("course_audit", {})
+            st.markdown('<div class="section-header">🎓 Course Completeness</div>', unsafe_allow_html=True)
+            sc_score = ca.get("sections_score", 0)
+            st.progress(int(sc_score) / 100, text=f"Section Score: {sc_score:.0f}%")
+            secs = ca.get("sections_found", {})
+            cols = st.columns(2)
+            for i, (name, found) in enumerate(secs.items()):
+                cols[i % 2].markdown(f"{'✅' if found else '❌'} {name}")
+        elif atype == "blog":
+            ba = r.get("blog_audit", {})
+            st.markdown('<div class="section-header">📝 Blog Completeness</div>', unsafe_allow_html=True)
+            el_score = ba.get("elements_score", 0)
+            st.progress(int(el_score) / 100, text=f"Elements Score: {el_score:.0f}%")
+            elems = ba.get("elements_found", {})
+            cols = st.columns(2)
+            for i, (name, found) in enumerate(elems.items()):
+                cols[i % 2].markdown(f"{'✅' if found else '❌'} {name}")
+            st.caption(
+                f"Readability: {ba.get('readability_score','—')} | "
+                f"Schema: {'✅' if ba.get('has_article_schema') else '❌'} | "
+                f"OG Tags: {'✅' if ba.get('has_og_tags') else '❌'}"
+            )
+
+    with right:
+        # Score breakdown radar
+        st.markdown('<div class="section-header">📊 Score Breakdown</div>', unsafe_allow_html=True)
+        bd = r.get("score_breakdown", {})
+        if bd:
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(
+                r=[bd.get(k, 100) for k in bd],
+                theta=[k.replace("_", " ").title() for k in bd],
+                fill="toself",
+                line_color="#3B82F6",
+                fillcolor="rgba(59,130,246,0.15)",
+            ))
+            fig.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                showlegend=False,
+                height=300,
+                margin=dict(t=10, b=10, l=10, r=10),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            for k, v in bd.items():
+                bar_color = _score_color(v)
+                st.markdown(
+                    f"""<div style='display:flex;justify-content:space-between;align-items:center;
+                    padding:4px 0;border-bottom:1px solid #F1F5F9'>
+                        <span style='font-size:.8rem;color:#374151'>{k.replace("_"," ").title()}</span>
+                        <span style='font-size:.85rem;font-weight:700;color:{bar_color}'>{v:.0f}</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Issues & Recommendations ──────────────────────────────────────────
+    st.markdown('<div class="section-header">⚠️ Issues & Recommendations</div>', unsafe_allow_html=True)
+
+    if not issues:
+        st.success("🎉 No issues found — this page is well optimised!")
+    else:
+        sev_order = ["Critical", "High", "Medium", "Warning", "Low"]
+        sev_colors = {
+            "Critical": "#EF4444", "High": "#F97316",
+            "Medium": "#EAB308", "Warning": "#F59E0B", "Low": "#3B82F6",
+        }
+        sev_bg = {
+            "Critical": "#FEF2F2", "High": "#FFF7ED",
+            "Medium": "#FEFCE8", "Warning": "#FFFBEB", "Low": "#EFF6FF",
+        }
+
+        for sev in sev_order:
+            sev_issues = [i for i in issues if i.get("severity") == sev]
+            if not sev_issues:
+                continue
+            color = sev_colors.get(sev, "#6B7280")
+            with st.expander(
+                f"**{sev}** — {len(sev_issues)} issue(s)",
+                expanded=sev in ["Critical", "High"],
+            ):
+                for iss in sev_issues:
+                    st.markdown(
+                        f"""
+                        <div style='padding:10px 14px;background:{sev_bg.get(sev,"#F8FAFC")};
+                        border-radius:8px;margin-bottom:8px;
+                        border-left:4px solid {color}'>
+                            <div style='font-weight:700;font-size:.88rem;color:#0F172A'>
+                                {iss.get("issue","")}
+                            </div>
+                            <div style='font-size:.75rem;color:#64748B;margin-top:2px'>
+                                📂 {iss.get("category","")}
+                            </div>
+                            <div style='font-size:.83rem;color:#1D4ED8;margin-top:6px'>
+                                ✅ {iss.get("recommendation","")}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+
 def page_new_audit():
     st.markdown(
         "<h2 style='font-size:1.5rem;font-weight:700;color:#0F172A'>🚀 New Audit</h2>",
