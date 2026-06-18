@@ -2562,15 +2562,18 @@ def page_mobile_audit():
                 unsafe_allow_html=True)
     rows = []
     for r in results:
-        ma = r.get("mobile_audit", {})
+        ma  = r.get("mobile_audit", {})
+        cwv = ma.get("cwv", {})
+        ps  = cwv.get("perf_score", 0) or 0
+        psi_available = "PageSpeed" in cwv.get("source", "")
         rows.append({
-            "URL":              r.get("url","")[-70:],
-            "Mobile Friendly":  "✅ Yes" if ma.get("is_mobile_friendly") else "❌ No",
-            "Viewport":         "✅" if ma.get("summary",{}).get("viewport_ok") else "❌",
-            "Perf Score":       ma.get("cwv",{}).get("perf_score", "—"),
-            "UX Issues":        len(ma.get("issues",[])),
-            "Passed Checks":    f"{ma.get('passed_checks',0)}/{ma.get('total_checks',0)}",
-            "Mobile Score":     f"{ma.get('mobile_score',0)}%",
+            "URL":                r.get("url","")[-70:],
+            "Mobile Friendly":    "✅ Yes" if ma.get("is_mobile_friendly") else "❌ No",
+            "Viewport":           "✅" if ma.get("summary",{}).get("viewport_ok") else "❌",
+            "Lighthouse Score":   f"{ps}%" if psi_available else "—",
+            "UX Check Score":     f"{ma.get('mobile_score',0)}% ({ma.get('passed_checks',0)}/{ma.get('total_checks',0)} checks)",
+            "UX Issues":          len(ma.get("issues",[])),
+            "Source":             "PSI" if psi_available else "Heuristic",
         })
     mob_df = pd.DataFrame(rows)
     st.dataframe(mob_df, use_container_width=True, hide_index=True)
@@ -2590,17 +2593,33 @@ def page_mobile_audit():
         return
 
     # KPI strip
+    cwv_now      = ma.get("cwv", {})
+    ps_now       = cwv_now.get("perf_score", 0) or 0
+    psi_now      = "PageSpeed" in cwv_now.get("source", "")
+    ux_score     = ma.get("mobile_score", 0)
+    score_lbl    = "Lighthouse Score" if psi_now else "UX Check Score"
+    score_val    = f"{ps_now}%" if psi_now else f"{ux_score}%"
+    score_sub    = "(PageSpeed Insights)" if psi_now else f"({ma.get('passed_checks',0)}/{ma.get('total_checks',0)} checks passed)"
+    score_clr    = "#10B981" if ps_now >= 90 else "#F59E0B" if ps_now >= 50 else "#EF4444"
+
     k1, k2, k3, k4, k5 = st.columns(5)
-    _mob_kpis = [
-        (k1, "Mobile Score",    f"{ma.get('mobile_score',0)}%",
-             "#10B981" if ma.get("mobile_score",0) >= 80 else "#F59E0B" if ma.get("mobile_score",0) >= 60 else "#EF4444"),
+    with k1:
+        st.markdown(f"""
+        <div style='background:var(--seo-card-bg,#fff);border:1px solid {"#10B981" if psi_now else "var(--seo-border,rgba(148,163,184,.22))"};
+             border-radius:10px;padding:14px;text-align:center'>
+            <div style='font-size:1.6rem;font-weight:800;color:{score_clr}'>{score_val}</div>
+            <div style='font-size:.75rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-top:3px'>{score_lbl}</div>
+            <div style='font-size:.65rem;color:var(--seo-muted,#64748B);margin-top:2px'>{score_sub}</div>
+        </div>""", unsafe_allow_html=True)
+
+    _mob_kpis_rest = [
         (k2, "Checks Passed",   f"{ma.get('passed_checks',0)}/{ma.get('total_checks',0)}", "#3B82F6"),
         (k3, "Issues Found",    len(ma.get("issues",[])),   "#F97316"),
-        (k4, "Perf Score",      ma.get("cwv",{}).get("perf_score","—"), "#6366F1"),
+        (k4, "UX Check Score",  f"{ux_score}%",             "#8B5CF6" if psi_now else "#6366F1"),
         (k5, "Mobile Friendly", "✅ Yes" if ma.get("is_mobile_friendly") else "❌ No",
              "#10B981" if ma.get("is_mobile_friendly") else "#EF4444"),
     ]
-    for col, lbl, val, clr in _mob_kpis:
+    for col, lbl, val, clr in _mob_kpis_rest:
         with col:
             st.markdown(f"""
             <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
