@@ -117,28 +117,28 @@ def _rel_badge(is_dofollow, is_nofollow, is_sponsored, is_ugc):
     return "<span style='background:#D1FAE5;color:#065F46;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Dofollow</span>"
 
 
-def render_link_table(links, show_source=False, source_label="Source", max_rows=100):
+def render_link_table(links, show_source=False, source_label="Source", max_rows=100, key_prefix="lnk"):
     """Render an Ahrefs-style link table with status badges."""
     if not links:
         st.info("No links found.")
         return
 
-    # Filter controls
+    # Filter controls — keys must be stable across reruns (no id(obj) which changes every run)
     fc1, fc2, fc3 = st.columns([2, 2, 2])
     with fc1:
         filter_rel = st.selectbox(
             "Filter by Rel",
             ["All", "Dofollow", "Nofollow", "Sponsored", "UGC"],
-            key=f"rel_f_{id(links)}"
+            key=f"{key_prefix}_rel_f"
         )
     with fc2:
         filter_health = st.selectbox(
             "Filter by Status",
             ["All", "OK (2xx)", "Redirect (3xx)", "Broken (4xx/5xx)", "Blocked (999)", "Not Checked"],
-            key=f"hlt_f_{id(links)}"
+            key=f"{key_prefix}_hlt_f"
         )
     with fc3:
-        search_q = st.text_input("Search URL / Anchor", key=f"srch_f_{id(links)}")
+        search_q = st.text_input("Search URL / Anchor", key=f"{key_prefix}_srch_f")
 
     filtered = links
     if filter_rel == "Dofollow":
@@ -657,7 +657,7 @@ def render_inline_result(r):
         lm4.metric("Broken", il.get("broken_count",0))
         lm5.metric("Redirects", il.get("redirect_count",0))
         if il_links:
-            render_link_table(il_links, max_rows=100)
+            render_link_table(il_links, max_rows=100, key_prefix="url_il")
         else:
             st.info("No internal links found — enable 'Audit Links' to collect link data.")
 
@@ -681,9 +681,9 @@ def render_inline_result(r):
                 st.error(f"⚠️ {bc} broken external link(s) detected — these return 4xx/5xx HTTP errors.")
             if blk:
                 st.warning(f"🚫 {blk} link(s) blocked (e.g. LinkedIn/Twitter return 999) — not necessarily broken, site blocks automated checks.")
-            render_link_table(el_links, max_rows=100)
+            render_link_table(el_links, max_rows=100, key_prefix="url_el")
         else:
-            render_link_table(el_links, max_rows=100)
+            render_link_table(el_links, max_rows=100, key_prefix="url_el")
 
         if not il_links and not el_links:
             st.markdown("""
@@ -1837,7 +1837,7 @@ def page_url_detail():
         i5.metric("Broken",      il.get("broken_count",0))
         i6.metric("Weak Anchors",il.get("weak_anchor_count",0))
         if il.get("links"):
-            render_link_table(il["links"], max_rows=150)
+            render_link_table(il["links"], max_rows=150, key_prefix="det_il")
         else:
             st.info("Enable 'Audit Links' in sidebar settings to see internal link details.")
 
@@ -1860,7 +1860,7 @@ def page_url_detail():
             st.warning(f"🚫 {blk_d} link(s) blocked (LinkedIn, Twitter etc. return 999 for bots) — not broken, just restricted access.")
 
         if el_.get("links"):
-            render_link_table(el_["links"], max_rows=150)
+            render_link_table(el_["links"], max_rows=150, key_prefix="det_el")
         else:
             st.info("Enable 'Audit Links' in sidebar settings to see external link details.")
 
@@ -2237,7 +2237,7 @@ def page_link_analysis():
 
         st.markdown('<div class="section-header">📋 All Internal Links</div>', unsafe_allow_html=True)
         if all_int_links:
-            render_link_table(all_int_links, show_source=True, source_label="Source Page", max_rows=300)
+            render_link_table(all_int_links, show_source=True, source_label="Source Page", max_rows=300, key_prefix="la_il")
         else:
             st.info("No internal link data. Enable 'Audit Links' and re-run the audit.")
 
@@ -2350,7 +2350,7 @@ def page_link_analysis():
 
         st.markdown('<div class="section-header">📋 All External Links</div>', unsafe_allow_html=True)
         if all_ext_links:
-            render_link_table(all_ext_links, show_source=True, source_label="Source Page", max_rows=300)
+            render_link_table(all_ext_links, show_source=True, source_label="Source Page", max_rows=300, key_prefix="la_el")
         else:
             st.info("No external link data. Enable 'Audit Links' and re-run the audit.")
 
