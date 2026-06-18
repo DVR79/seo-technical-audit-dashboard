@@ -24,6 +24,28 @@ css_path = Path("assets/style.css")
 if css_path.exists():
     st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 
+# ── Block Streamlit's 'C' keyboard shortcut (triggers Clear Caches dialog) ─
+# Streamlit registers 'C' as a hotkey. When users press Ctrl+C to copy text
+# the C keypress leaks through and opens the dialog. We intercept it early.
+st.markdown("""
+<script>
+(function() {
+    function blockClearCacheShortcut(e) {
+        // Block bare 'C' / 'c' key when not typing in an input/textarea
+        if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            var tag = (document.activeElement || {}).tagName || '';
+            var editable = (document.activeElement || {}).isContentEditable;
+            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !editable) {
+                e.stopImmediatePropagation();
+            }
+        }
+    }
+    // Use capture phase so we run before Streamlit's listener
+    document.addEventListener('keydown', blockClearCacheShortcut, true);
+})();
+</script>
+""", unsafe_allow_html=True)
+
 # ── Session state ──────────────────────────────────────────────────────────
 for key, default in [
     ("audit_results", []),
