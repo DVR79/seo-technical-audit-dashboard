@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════
    SEO Technical Audit Dashboard — Theme-aware CSS
-   Works with Streamlit Light AND Dark modes
+   Uses --seo-* namespace to avoid collisions with Streamlit's
+   own --st-* design tokens (added in Streamlit 1.44+)
    ══════════════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -11,17 +12,17 @@ html, body, [class*="css"] {
 
 /* ── CSS Custom Properties (Light defaults) ──────────────────── */
 :root {
-    --st-card-bg:        #FFFFFF;
-    --st-card-border:    rgba(148,163,184,0.22);
-    --st-card-shadow:    rgba(0,0,0,0.06);
-    --st-section-color:  #0F172A;
-    --st-muted:          #64748B;
-    --st-body-text:      #1E293B;
-    --st-info-bg:        rgba(37,99,235,0.07);
-    --st-info-border:    rgba(37,99,235,0.25);
-    --st-info-text:      #1D4ED8;
-    --st-hover-bg:       rgba(148,163,184,0.08);
-    /* Severity cards — semi-transparent, works on any bg */
+    --seo-card-bg:       #FFFFFF;
+    --seo-border:        rgba(148,163,184,0.22);
+    --seo-shadow:        rgba(0,0,0,0.06);
+    --seo-heading:       #0F172A;
+    --seo-muted:         #64748B;
+    --seo-text:          #1E293B;
+    --seo-info-bg:       rgba(37,99,235,0.07);
+    --seo-info-border:   rgba(37,99,235,0.25);
+    --seo-info-text:     #1D4ED8;
+    --seo-hover:         rgba(148,163,184,0.08);
+    /* Severity — semi-transparent, works on any bg */
     --sev-critical-bg:   rgba(239,68,68,0.10);
     --sev-high-bg:       rgba(249,115,22,0.10);
     --sev-warning-bg:    rgba(245,158,11,0.10);
@@ -40,16 +41,17 @@ html, body, [class*="css"] {
 /* ── Dark mode (Streamlit toggle & OS pref) ──────────────────── */
 [data-theme="dark"],
 .stApp[data-theme="dark"],
-html[data-theme="dark"] {
-    --st-card-bg:       rgba(30,41,59,0.95);
-    --st-card-border:   rgba(51,65,85,0.6);
-    --st-section-color: #F1F5F9;
-    --st-muted:         #94A3B8;
-    --st-body-text:     #CBD5E1;
-    --st-info-bg:       rgba(37,99,235,0.15);
-    --st-info-border:   rgba(59,130,246,0.35);
-    --st-info-text:     #93C5FD;
-    --st-hover-bg:      rgba(255,255,255,0.05);
+html[data-theme="dark"],
+[data-testid="stAppViewContainer"][data-theme="dark"] {
+    --seo-card-bg:      rgba(30,41,59,0.95);
+    --seo-border:       rgba(51,65,85,0.6);
+    --seo-heading:      #F1F5F9;
+    --seo-muted:        #94A3B8;
+    --seo-text:         #CBD5E1;
+    --seo-info-bg:      rgba(37,99,235,0.15);
+    --seo-info-border:  rgba(59,130,246,0.35);
+    --seo-info-text:    #93C5FD;
+    --seo-hover:        rgba(255,255,255,0.05);
     --sev-critical-bg:  rgba(239,68,68,0.15);
     --sev-high-bg:      rgba(249,115,22,0.15);
     --sev-warning-bg:   rgba(245,158,11,0.15);
@@ -65,15 +67,15 @@ html[data-theme="dark"] {
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --st-card-bg:       rgba(30,41,59,0.95);
-        --st-card-border:   rgba(51,65,85,0.6);
-        --st-section-color: #F1F5F9;
-        --st-muted:         #94A3B8;
-        --st-body-text:     #CBD5E1;
-        --st-info-bg:       rgba(37,99,235,0.15);
-        --st-info-border:   rgba(59,130,246,0.35);
-        --st-info-text:     #93C5FD;
-        --st-hover-bg:      rgba(255,255,255,0.05);
+        --seo-card-bg:      rgba(30,41,59,0.95);
+        --seo-border:       rgba(51,65,85,0.6);
+        --seo-heading:      #F1F5F9;
+        --seo-muted:        #94A3B8;
+        --seo-text:         #CBD5E1;
+        --seo-info-bg:      rgba(37,99,235,0.15);
+        --seo-info-border:  rgba(59,130,246,0.35);
+        --seo-info-text:    #93C5FD;
+        --seo-hover:        rgba(255,255,255,0.05);
         --sev-critical-bg:  rgba(239,68,68,0.15);
         --sev-high-bg:      rgba(249,115,22,0.15);
         --sev-warning-bg:   rgba(245,158,11,0.15);
@@ -113,17 +115,17 @@ html[data-theme="dark"] {
 
 /* ── Metric cards ────────────────────────────────────────────── */
 .metric-card {
-    background: var(--st-card-bg);
-    border: 1px solid var(--st-card-border);
+    background: var(--seo-card-bg);
+    border: 1px solid var(--seo-border);
     border-radius: 12px;
     padding: 18px 20px;
-    box-shadow: 0 1px 4px var(--st-card-shadow);
+    box-shadow: 0 1px 4px var(--seo-shadow);
     text-align: center;
     transition: box-shadow .2s, transform .2s;
     margin-bottom: 4px;
 }
 .metric-card:hover {
-    box-shadow: 0 4px 16px var(--st-card-shadow);
+    box-shadow: 0 4px 16px var(--seo-shadow);
     transform: translateY(-1px);
 }
 .metric-card .metric-value {
@@ -134,7 +136,7 @@ html[data-theme="dark"] {
 }
 .metric-card .metric-label {
     font-size: 0.78rem;
-    color: var(--st-muted);
+    color: var(--seo-muted);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: .04em;
@@ -165,7 +167,7 @@ html[data-theme="dark"] {
 .section-header {
     font-size: 1.05rem;
     font-weight: 700;
-    color: var(--st-section-color);
+    color: var(--seo-heading);
     border-left: 4px solid #3B82F6;
     padding-left: 10px;
     margin: 18px 0 12px;
@@ -174,19 +176,19 @@ html[data-theme="dark"] {
 
 /* ── Info / alert boxes ──────────────────────────────────────── */
 .info-box {
-    background: var(--st-info-bg);
-    border: 1px solid var(--st-info-border);
+    background: var(--seo-info-bg);
+    border: 1px solid var(--seo-info-border);
     border-radius: 8px;
     padding: 12px 16px;
     font-size: 0.85rem;
-    color: var(--st-info-text);
+    color: var(--seo-info-text);
     margin-bottom: 10px;
 }
 .info-box b { color: inherit; }
 
 /* ── Issue / recommendation cards ───────────────────────────── */
 .issue-card {
-    background: var(--st-hover-bg);
+    background: var(--seo-hover);
     border-radius: 8px;
     padding: 10px 14px;
     margin-bottom: 8px;
@@ -195,7 +197,7 @@ html[data-theme="dark"] {
 .issue-card .issue-title {
     font-weight: 700;
     font-size: .88rem;
-    color: var(--st-section-color);
+    color: var(--seo-heading);
 }
 .issue-card .issue-rec {
     font-size: .83rem;
@@ -204,14 +206,14 @@ html[data-theme="dark"] {
 }
 .issue-card .issue-meta {
     font-size: .75rem;
-    color: var(--st-muted);
+    color: var(--seo-muted);
     margin-top: 3px;
 }
 
 /* ── SEMrush-style health panel ──────────────────────────────── */
 .health-panel {
-    background: var(--st-card-bg);
-    border: 1px solid var(--st-card-border);
+    background: var(--seo-card-bg);
+    border: 1px solid var(--seo-border);
     border-radius: 14px;
     padding: 20px 24px;
     margin-bottom: 16px;
@@ -219,7 +221,7 @@ html[data-theme="dark"] {
 .health-panel .health-title {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--st-section-color);
+    color: var(--seo-heading);
     margin-bottom: 14px;
 }
 
@@ -233,13 +235,13 @@ html[data-theme="dark"] {
 .cwv-box.needs { background: var(--cwv-needs-bg); }
 .cwv-box.poor  { background: var(--cwv-poor-bg); }
 .cwv-box .cwv-value { font-size: 1.4rem; font-weight: 800; }
-.cwv-box .cwv-label { font-size: .72rem; color: var(--st-muted); text-transform: uppercase; letter-spacing: .04em; }
+.cwv-box .cwv-label { font-size: .72rem; color: var(--seo-muted); text-transform: uppercase; letter-spacing: .04em; }
 .cwv-box .cwv-status { font-size: .78rem; font-weight: 600; margin-top: 4px; }
 
 /* ── Quick wins card ─────────────────────────────────────────── */
 .qw-card {
-    background: var(--st-card-bg);
-    border: 1px solid var(--st-card-border);
+    background: var(--seo-card-bg);
+    border: 1px solid var(--seo-border);
     border-radius: 10px;
     padding: 12px 16px;
     margin-bottom: 8px;
@@ -260,17 +262,15 @@ html[data-theme="dark"] {
     font-weight: 700;
     flex-shrink: 0;
 }
-.qw-text {
-    flex: 1;
-}
+.qw-text { flex: 1; }
 .qw-title {
     font-weight: 600;
     font-size: .85rem;
-    color: var(--st-section-color);
+    color: var(--seo-heading);
 }
 .qw-sub {
     font-size: .75rem;
-    color: var(--st-muted);
+    color: var(--seo-muted);
     margin-top: 2px;
 }
 
@@ -278,33 +278,31 @@ html[data-theme="dark"] {
 .link-table {
     width: 100%;
     border-collapse: collapse;
-    background: var(--st-card-bg);
+    background: var(--seo-card-bg);
     border-radius: 10px;
     overflow: hidden;
-    border: 1px solid var(--st-card-border);
+    border: 1px solid var(--seo-border);
     margin-top: 8px;
 }
-.link-table thead {
-    background: var(--table-header-bg);
-}
+.link-table thead { background: var(--table-header-bg); }
 .link-table th {
     padding: 8px 10px;
     text-align: left;
-    color: var(--st-muted);
+    color: var(--seo-muted);
     font-size: .78rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .04em;
-    border-bottom: 1px solid var(--st-card-border);
+    border-bottom: 1px solid var(--seo-border);
 }
 .link-table td {
     padding: 7px 10px;
     border-bottom: 1px solid var(--table-row-border);
     font-size: .78rem;
-    color: var(--st-body-text);
+    color: var(--seo-text);
 }
 .link-table tr:last-child td { border-bottom: none; }
-.link-table tr:hover td { background: var(--st-hover-bg); }
+.link-table tr:hover td { background: var(--seo-hover); }
 
 /* ── Technical signal grid ───────────────────────────────────── */
 .signal-grid {
@@ -314,16 +312,16 @@ html[data-theme="dark"] {
     margin: 10px 0;
 }
 .signal-item {
-    background: var(--st-card-bg);
-    border: 1px solid var(--st-card-border);
+    background: var(--seo-card-bg);
+    border: 1px solid var(--seo-border);
     border-radius: 8px;
     padding: 10px 8px;
     text-align: center;
     font-size: .75rem;
-    color: var(--st-body-text);
+    color: var(--seo-text);
 }
 .signal-item .signal-icon { font-size: 1.1rem; display: block; margin-bottom: 3px; }
-.signal-item .signal-label { font-size: .68rem; color: var(--st-muted); }
+.signal-item .signal-label { font-size: .68rem; color: var(--seo-muted); }
 
 /* ── Progress bars ───────────────────────────────────────────── */
 .stProgress > div > div {

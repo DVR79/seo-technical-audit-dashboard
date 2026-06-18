@@ -173,33 +173,33 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         noop    = "" if lk.get("has_noopener") else ("⚠️" if lk.get("opens_new_tab") else "")
         short_url = url[:70] + ("…" if len(url) > 70 else "")
         short_anc = anchor[:55] + ("…" if len(anchor) > 55 else "")
-        source_col = (f"<td style='font-size:.72rem;color:var(--st-muted,#64748B);max-width:130px;word-break:break-all'>"
+        source_col = (f"<td style='font-size:.72rem;color:var(--seo-muted,#64748B);max-width:130px;word-break:break-all'>"
                       f"{lk.get('source','')[:60]}</td>") if show_source else ""
 
         rows_html += f"""
         <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15));'>
             {source_col}
             <td style='padding:7px 10px;max-width:260px;word-break:break-all'>
-                <a href='{url}' target='_blank' style='font-size:.78rem;color:var(--st-info-text,#1D4ED8);text-decoration:none'
+                <a href='{url}' target='_blank' style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none'
                    title='{url}'>{short_url}</a>
                 <div style='font-size:.7rem;color:#94A3B8;margin-top:2px'>{short_anc}</div>
             </td>
             <td style='padding:7px 10px;text-align:center'>{rbadge}</td>
             <td style='padding:7px 10px;text-align:center'>{hbadge}</td>
-            <td style='padding:7px 10px;text-align:center;font-size:.75rem;color:var(--st-muted,#64748B)'>{new_tab} {noop}</td>
+            <td style='padding:7px 10px;text-align:center;font-size:.75rem;color:var(--seo-muted,#64748B)'>{new_tab} {noop}</td>
         </tr>"""
 
-    source_th = f"<th style='padding:8px 10px;text-align:left;color:var(--st-body-text,#374151);font-size:.78rem'>{source_label}</th>" if show_source else ""
+    source_th = f"<th style='padding:8px 10px;text-align:left;color:var(--seo-text,#374151);font-size:.78rem'>{source_label}</th>" if show_source else ""
     table_html = f"""
-    <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--st-card-border,rgba(148,163,184,.22));margin-top:8px'>
-    <table style='width:100%;border-collapse:collapse;background:var(--st-card-bg,#FFFFFF)'>
-        <thead style='background:var(--st-card-bg,#F8FAFC)'>
+    <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--seo-border,rgba(148,163,184,.22));margin-top:8px'>
+    <table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#FFFFFF)'>
+        <thead style='background:var(--seo-card-bg,#F8FAFC)'>
             <tr>
                 {source_th}
-                <th style='padding:8px 10px;text-align:left;color:var(--st-body-text,#374151);font-size:.78rem'>Target URL / Anchor Text</th>
-                <th style='padding:8px 10px;text-align:center;color:var(--st-body-text,#374151);font-size:.78rem'>Link Type</th>
-                <th style='padding:8px 10px;text-align:center;color:var(--st-body-text,#374151);font-size:.78rem'>Status</th>
-                <th style='padding:8px 10px;text-align:center;color:var(--st-body-text,#374151);font-size:.78rem'>Tab / Security</th>
+                <th style='padding:8px 10px;text-align:left;color:var(--seo-text,#374151);font-size:.78rem'>Target URL / Anchor Text</th>
+                <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Link Type</th>
+                <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Status</th>
+                <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Tab / Security</th>
             </tr>
         </thead>
         <tbody>{rows_html}</tbody>
@@ -281,18 +281,18 @@ def render_serp_preview(serp_data):
     d_color = "#d93025" if (d_short or d_long) else "#4d5156"
 
     st.markdown(f"""
-    <div style="font-family:Arial,sans-serif;background:var(--st-card-bg,#fff);border-radius:10px;
-         padding:20px 24px;border:1px solid var(--st-card-border,rgba(148,163,184,.22));max-width:620px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <div style="font-family:Arial,sans-serif;background:var(--seo-card-bg,#fff);border-radius:10px;
+         padding:20px 24px;border:1px solid var(--seo-border,rgba(148,163,184,.22));max-width:620px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <div style="width:28px;height:28px;background:#e8f0fe;border-radius:50%;
                  display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#1967d2">G</div>
             <div>
-                <div style="font-size:13px;color:var(--st-body-text,#202124);font-weight:500">Google Search Preview</div>
-                <div style="font-size:11px;color:var(--st-muted,#5f6368)">{bc}</div>
+                <div style="font-size:13px;color:var(--seo-text,#202124);font-weight:500">Google Search Preview</div>
+                <div style="font-size:11px;color:var(--seo-muted,#5f6368)">{bc}</div>
             </div>
         </div>
-        <div style="height:1px;background:var(--st-card-border,#e0e0e0);margin-bottom:10px"></div>
-        <div style="font-size:11px;color:var(--st-muted,#5f6368);margin-bottom:3px">{bc}</div>
+        <div style="height:1px;background:var(--seo-border,#e0e0e0);margin-bottom:10px"></div>
+        <div style="font-size:11px;color:var(--seo-muted,#5f6368);margin-bottom:3px">{bc}</div>
         <div style="font-size:19px;color:{t_color};line-height:1.3;margin-bottom:4px;
              font-family:arial,sans-serif;cursor:pointer;text-decoration:none">
             {title}
@@ -327,13 +327,13 @@ def render_social_preview(social_data, url):
 
     st.markdown("**Facebook / LinkedIn Card**")
     st.markdown(f"""
-    <div style="max-width:420px;border-radius:10px;overflow:hidden;border:1px solid var(--st-card-border,rgba(148,163,184,.22));
+    <div style="max-width:420px;border-radius:10px;overflow:hidden;border:1px solid var(--seo-border,rgba(148,163,184,.22));
          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.1)">
         {img_html}
-        <div style="background:var(--st-card-bg,#f7f8fa);padding:10px 14px;border-top:1px solid var(--st-card-border,rgba(148,163,184,.22))">
-            <div style="font-size:11px;color:var(--st-muted,#606770);text-transform:uppercase;letter-spacing:.04em">{site_name}</div>
-            <div style="font-size:15px;font-weight:700;color:var(--st-section-color,#1c1e21);margin:4px 0;line-height:1.3">{og_title[:80]}</div>
-            <div style="font-size:13px;color:var(--st-muted,#606770);line-height:1.45">{og_desc[:120]}{"…" if len(og_desc)>120 else ""}</div>
+        <div style="background:var(--seo-card-bg,#f7f8fa);padding:10px 14px;border-top:1px solid var(--seo-border,rgba(148,163,184,.22))">
+            <div style="font-size:11px;color:var(--seo-muted,#606770);text-transform:uppercase;letter-spacing:.04em">{site_name}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--seo-heading,#1c1e21);margin:4px 0;line-height:1.3">{og_title[:80]}</div>
+            <div style="font-size:13px;color:var(--seo-muted,#606770);line-height:1.45">{og_desc[:120]}{"…" if len(og_desc)>120 else ""}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -349,13 +349,13 @@ def render_social_preview(social_data, url):
         '📷 No twitter:image found</div>'
     )
     st.markdown(f"""
-    <div style="max-width:420px;border-radius:14px;overflow:hidden;border:1px solid var(--st-card-border,rgba(148,163,184,.22));
+    <div style="max-width:420px;border-radius:14px;overflow:hidden;border:1px solid var(--seo-border,rgba(148,163,184,.22));
          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.08)">
         {img_html2}
-        <div style="background:var(--st-card-bg,#fff);padding:10px 14px">
-            <div style="font-size:14px;font-weight:700;color:var(--st-section-color,#0f1419)">{og_title[:70]}</div>
-            <div style="font-size:13px;color:var(--st-muted,#536471);margin-top:2px">{og_desc[:100]}{"…" if len(og_desc)>100 else ""}</div>
-            <div style="font-size:12px;color:var(--st-muted,#536471);margin-top:4px">🔗 {site_name}</div>
+        <div style="background:var(--seo-card-bg,#fff);padding:10px 14px">
+            <div style="font-size:14px;font-weight:700;color:var(--seo-heading,#0f1419)">{og_title[:70]}</div>
+            <div style="font-size:13px;color:var(--seo-muted,#536471);margin-top:2px">{og_desc[:100]}{"…" if len(og_desc)>100 else ""}</div>
+            <div style="font-size:12px;color:var(--seo-muted,#536471);margin-top:4px">🔗 {site_name}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -487,15 +487,15 @@ def render_inline_result(r):
             wc_color = "#EF4444" if cont.get("is_thin") else ("#F59E0B" if wc < 600 else "#10B981")
             st.markdown(f"""
             <div style='display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px'>
-                <div style='background:var(--st-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
+                <div style='background:var(--seo-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
                     <div style='font-size:1.3rem;font-weight:700;color:{wc_color}'>{wc:,}</div>
-                    <div style='font-size:.7rem;color:var(--st-muted,#64748B)'>Words</div></div>
-                <div style='background:var(--st-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
+                    <div style='font-size:.7rem;color:var(--seo-muted,#64748B)'>Words</div></div>
+                <div style='background:var(--seo-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
                     <div style='font-size:1.3rem;font-weight:700;color:#3B82F6'>{cont.get("reading_time",0)}</div>
-                    <div style='font-size:.7rem;color:var(--st-muted,#64748B)'>Min Read</div></div>
-                <div style='background:var(--st-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
+                    <div style='font-size:.7rem;color:var(--seo-muted,#64748B)'>Min Read</div></div>
+                <div style='background:var(--seo-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;text-align:center'>
                     <div style='font-size:1.3rem;font-weight:700;color:#6366F1'>{cont.get("content_ratio",0)}%</div>
-                    <div style='font-size:.7rem;color:var(--st-muted,#64748B)'>Content Ratio</div></div>
+                    <div style='font-size:.7rem;color:var(--seo-muted,#64748B)'>Content Ratio</div></div>
             </div>""", unsafe_allow_html=True)
 
             # Links
@@ -508,10 +508,10 @@ def render_inline_result(r):
                 il_nf   = il.get("nofollow_count",0)
                 il_blk  = il.get("redirect_count",0) or 0
                 st.markdown(f"""
-                <div style='background:var(--st-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;border:1px solid var(--st-card-border,rgba(148,163,184,.22))'>
-                    <div style='font-weight:700;font-size:.82rem;color:var(--st-section-color,#0F172A);margin-bottom:6px'>🔵 Internal Links</div>
+                <div style='background:var(--seo-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+                    <div style='font-weight:700;font-size:.82rem;color:var(--seo-heading,#0F172A);margin-bottom:6px'>🔵 Internal Links</div>
                     <div style='display:flex;gap:10px;flex-wrap:wrap'>
-                        <span style='font-size:.75rem;color:var(--st-body-text,#374151)'>Total: <b>{il_tot}</b></span>
+                        <span style='font-size:.75rem;color:var(--seo-text,#374151)'>Total: <b>{il_tot}</b></span>
                         <span style='font-size:.75rem;color:#10B981'>Dofollow: <b>{il_df}</b></span>
                         <span style='font-size:.75rem;color:#EF4444'>Nofollow: <b>{il_nf}</b></span>
                         <span style='font-size:.75rem;color:#F59E0B'>Redirects: <b>{il_blk}</b></span>
@@ -528,13 +528,13 @@ def render_inline_result(r):
                 el_nf   = el_.get("nofollow_count",0)
                 el_dom  = el_.get("unique_domains",0)
                 st.markdown(f"""
-                <div style='background:var(--st-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;border:1px solid var(--st-card-border,rgba(148,163,184,.22))'>
-                    <div style='font-weight:700;font-size:.82rem;color:var(--st-section-color,#0F172A);margin-bottom:6px'>🟣 External Links</div>
+                <div style='background:var(--seo-card-bg,#F8FAFC);border-radius:8px;padding:10px 14px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+                    <div style='font-weight:700;font-size:.82rem;color:var(--seo-heading,#0F172A);margin-bottom:6px'>🟣 External Links</div>
                     <div style='display:flex;gap:10px;flex-wrap:wrap'>
-                        <span style='font-size:.75rem;color:var(--st-body-text,#374151)'>Total: <b>{el_tot}</b></span>
+                        <span style='font-size:.75rem;color:var(--seo-text,#374151)'>Total: <b>{el_tot}</b></span>
                         <span style='font-size:.75rem;color:#10B981'>Dofollow: <b>{el_df}</b></span>
                         <span style='font-size:.75rem;color:#EF4444'>Nofollow: <b>{el_nf}</b></span>
-                        <span style='font-size:.75rem;color:var(--st-body-text,#374151)'>Domains: <b>{el_dom}</b></span>
+                        <span style='font-size:.75rem;color:var(--seo-text,#374151)'>Domains: <b>{el_dom}</b></span>
                     </div>
                     <div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap'>
                         {"<span style='background:#FEE2E2;color:#991B1B;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(be) + " Broken</span>" if be else "<span style='background:#D1FAE5;color:#065F46;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken</span>"}
@@ -582,7 +582,7 @@ def render_inline_result(r):
                     st.markdown(
                         f"""<div style='display:flex;justify-content:space-between;
                         padding:4px 0;border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15))'>
-                        <span style='font-size:.78rem;color:var(--st-body-text,#374151)'>{k.replace("_"," ").title()}</span>
+                        <span style='font-size:.78rem;color:var(--seo-text,#374151)'>{k.replace("_"," ").title()}</span>
                         <span style='font-weight:700;color:{_score_color(v)}'>{v:.0f}</span></div>""",
                         unsafe_allow_html=True)
 
@@ -627,9 +627,9 @@ def render_inline_result(r):
                 icon = "✅" if val else "❌"
                 col.markdown(
                     f"<div style='text-align:center;padding:6px 2px;"
-                    f"background:var(--st-card-bg,#F8FAFC);border-radius:8px;border:1px solid var(--st-card-border,rgba(148,163,184,.22))'>"
+                    f"background:var(--seo-card-bg,#F8FAFC);border-radius:8px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>"
                     f"<div style='font-size:1.2rem'>{icon}</div>"
-                    f"<div style='font-size:.65rem;color:var(--st-muted,#475569);margin-top:2px'>{label}</div>"
+                    f"<div style='font-size:.65rem;color:var(--seo-muted,#475569);margin-top:2px'>{label}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -769,9 +769,9 @@ def render_inline_result(r):
                 for raw_key, val in _raw_headers.items():
                     if raw_key.lower() == key:
                         crit_rows += (
-                            f"<tr><td style='padding:5px 10px;font-weight:600;color:var(--st-section-color,#1E40AF);"
+                            f"<tr><td style='padding:5px 10px;font-weight:600;color:var(--seo-heading,#1E40AF);"
                             f"font-size:.78rem;white-space:nowrap'>{raw_key}</td>"
-                            f"<td style='padding:5px 10px;font-size:.76rem;color:var(--st-body-text,#374151);"
+                            f"<td style='padding:5px 10px;font-size:.76rem;color:var(--seo-text,#374151);"
                             f"word-break:break-all'>{val}</td></tr>"
                         )
                         shown_keys.add(raw_key.lower())
@@ -781,22 +781,22 @@ def render_inline_result(r):
             for raw_key, val in _raw_headers.items():
                 if raw_key.lower() not in shown_keys:
                     other_rows += (
-                        f"<tr><td style='padding:4px 10px;font-size:.74rem;color:var(--st-muted,#64748B);"
+                        f"<tr><td style='padding:4px 10px;font-size:.74rem;color:var(--seo-muted,#64748B);"
                         f"white-space:nowrap'>{raw_key}</td>"
-                        f"<td style='padding:4px 10px;font-size:.73rem;color:var(--st-body-text,#475569);"
+                        f"<td style='padding:4px 10px;font-size:.73rem;color:var(--seo-text,#475569);"
                         f"word-break:break-all'>{val}</td></tr>"
                     )
 
             st.markdown(
-                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--st-card-border,rgba(148,163,184,.22))'>"
-                f"<table style='width:100%;border-collapse:collapse;background:var(--st-card-bg,#fff)'>"
+                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>"
+                f"<table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>"
                 f"<thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'><tr>"
-                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--st-muted,#1E40AF)'>Header</th>"
-                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--st-muted,#1E40AF)'>Value</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--seo-muted,#1E40AF)'>Header</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--seo-muted,#1E40AF)'>Value</th>"
                 f"</tr></thead><tbody>"
                 f"{crit_rows}"
                 f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:#94A3B8;"
-                f"background:var(--st-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
+                f"background:var(--seo-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
                 f"{other_rows}"
                 f"</tbody></table></div>",
                 unsafe_allow_html=True,
@@ -829,7 +829,7 @@ def render_inline_result(r):
                 f"background:{bg};border-radius:7px;margin-bottom:5px'>"
                 f"<span style='font-size:1rem'>{icon}</span>"
                 f"<span style='font-weight:600;font-size:.82rem;color:{color};min-width:220px'>{name}</span>"
-                f"<span style='font-size:.76rem;color:var(--st-body-text,#374151)'>{detail}</span>"
+                f"<span style='font-size:.76rem;color:var(--seo-text,#374151)'>{detail}</span>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -901,7 +901,7 @@ def render_inline_result(r):
                         <div style='padding:10px 14px;background:{_sev_bg(sev)};border-radius:8px;
                         margin-bottom:8px;border-left:4px solid {_sev_color(sev)}'>
                             <div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>
-                                <span style='font-weight:700;font-size:.88rem;color:var(--st-section-color,#0F172A)'>
+                                <span style='font-weight:700;font-size:.88rem;color:var(--seo-heading,#0F172A)'>
                                     {iss.get("issue","")}</span>
                                 <div style='display:flex;gap:6px'>
                                     <span style='background:{_sev_color(sev)};color:white;
@@ -912,8 +912,8 @@ def render_inline_result(r):
                                     padding:2px 8px;border-radius:4px;font-size:.72rem'>Effort: {eff}</span>
                                 </div>
                             </div>
-                            <div style='font-size:.75rem;color:var(--st-muted,#64748B);margin-top:3px'>📂 {iss.get("category","")}</div>
-                            <div style='font-size:.83rem;color:var(--st-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
+                            <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>📂 {iss.get("category","")}</div>
+                            <div style='font-size:.83rem;color:var(--seo-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
     # Tab 6 — Top Recommendations by Impact
@@ -934,17 +934,17 @@ def render_inline_result(r):
                 <div style='padding:12px 16px;background:{_sev_bg(sev)};border-radius:10px;
                 margin-bottom:10px;border-left:4px solid {_sev_color(sev)}'>
                     <div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px'>
-                        <span style='font-weight:700;font-size:.9rem;color:var(--st-section-color,#0F172A)'>
+                        <span style='font-weight:700;font-size:.9rem;color:var(--seo-heading,#0F172A)'>
                             {i}. {iss.get("issue","")}</span>
                         <div style='display:flex;gap:6px;align-items:center'>
                             <div style='background:rgba(148,163,184,.25);border-radius:4px;overflow:hidden;width:80px;height:10px'>
                                 <div style='background:{_sev_color(sev)};width:{bar_pct}%;height:100%'></div>
                             </div>
                             <span style='font-size:.78rem;font-weight:700;color:{_sev_color(sev)}'>{imp}/10</span>
-                            <span style='font-size:.75rem;color:var(--st-muted,#64748B)'>• Effort: {eff}</span>
+                            <span style='font-size:.75rem;color:var(--seo-muted,#64748B)'>• Effort: {eff}</span>
                         </div>
                     </div>
-                    <div style='font-size:.76rem;color:var(--st-muted,#64748B);margin:3px 0'>📂 {iss.get("category","")} • {sev}</div>
+                    <div style='font-size:.76rem;color:var(--seo-muted,#64748B);margin:3px 0'>📂 {iss.get("category","")} • {sev}</div>
                     <div style='font-size:.84rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                 </div>""", unsafe_allow_html=True)
 
@@ -958,9 +958,9 @@ def page_dashboard():
     last_date= st.session_state.last_audit_date
 
     st.markdown("""
-    <h1 style='font-size:1.8rem;font-weight:800;color:var(--st-section-color,#0F172A);margin-bottom:2px'>
+    <h1 style='font-size:1.8rem;font-weight:800;color:var(--seo-heading,#0F172A);margin-bottom:2px'>
     🔍 SEO Technical Audit Dashboard</h1>
-    <p style='color:var(--st-muted,#64748B);margin-bottom:20px'>Comprehensive SEO Audit for Courses and Blogs</p>
+    <p style='color:var(--seo-muted,#64748B);margin-bottom:20px'>Comprehensive SEO Audit for Courses and Blogs</p>
     """, unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
@@ -1021,7 +1021,7 @@ def page_dashboard():
                  padding:14px 16px;text-align:center;border:1px solid rgba(239,68,68,.2)'>
                 <div style='font-size:2rem;font-weight:800;color:#EF4444'>{crit_iss}</div>
                 <div style='font-size:.75rem;font-weight:700;color:#EF4444;margin-top:2px'>ERRORS</div>
-                <div style='font-size:.68rem;color:var(--st-muted,#64748B);margin-top:2px'>Critical issues</div>
+                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Critical issues</div>
             </div>""", unsafe_allow_html=True)
         with e2:
             st.markdown(f"""
@@ -1029,7 +1029,7 @@ def page_dashboard():
                  padding:14px 16px;text-align:center;border:1px solid rgba(249,115,22,.2)'>
                 <div style='font-size:2rem;font-weight:800;color:#F97316'>{high_iss}</div>
                 <div style='font-size:.75rem;font-weight:700;color:#F97316;margin-top:2px'>HIGH</div>
-                <div style='font-size:.68rem;color:var(--st-muted,#64748B);margin-top:2px'>High priority</div>
+                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>High priority</div>
             </div>""", unsafe_allow_html=True)
         with e3:
             st.markdown(f"""
@@ -1037,7 +1037,7 @@ def page_dashboard():
                  padding:14px 16px;text-align:center;border:1px solid rgba(245,158,11,.2)'>
                 <div style='font-size:2rem;font-weight:800;color:#F59E0B'>{warn_iss}</div>
                 <div style='font-size:.75rem;font-weight:700;color:#F59E0B;margin-top:2px'>WARNINGS</div>
-                <div style='font-size:.68rem;color:var(--st-muted,#64748B);margin-top:2px'>Medium priority</div>
+                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Medium priority</div>
             </div>""", unsafe_allow_html=True)
         with e4:
             st.markdown(f"""
@@ -1045,7 +1045,7 @@ def page_dashboard():
                  padding:14px 16px;text-align:center;border:1px solid rgba(59,130,246,.2)'>
                 <div style='font-size:2rem;font-weight:800;color:#3B82F6'>{notice_iss}</div>
                 <div style='font-size:.75rem;font-weight:700;color:#3B82F6;margin-top:2px'>NOTICES</div>
-                <div style='font-size:.68rem;color:var(--st-muted,#64748B);margin-top:2px'>Low priority</div>
+                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Low priority</div>
             </div>""", unsafe_allow_html=True)
 
     with hp2:
@@ -1098,10 +1098,10 @@ def page_dashboard():
     for col, lbl, cnt, clr in _cw_items:
         with col:
             st.markdown(f"""
-            <div style='background:var(--st-card-bg,#F8FAFC);border:1px solid var(--st-card-border,rgba(148,163,184,.22));
+            <div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));
                  border-radius:10px;padding:12px 10px;text-align:center'>
                 <div style='font-size:1.5rem;font-weight:800;color:{clr}'>{cnt}</div>
-                <div style='font-size:.72rem;color:var(--st-muted,#64748B);margin-top:2px'>{lbl}</div>
+                <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:2px'>{lbl}</div>
             </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1131,7 +1131,7 @@ def page_dashboard():
                             &nbsp;·&nbsp; Impact: <b>{imp}/10</b>
                             &nbsp;·&nbsp; <span style='color:#10B981;font-weight:600'>Low Effort</span>
                         </div>
-                        <div style='font-size:.75rem;color:var(--st-info-text,#1D4ED8);margin-top:4px'>
+                        <div style='font-size:.75rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
                             ✅ {qw.get("recommendation","")}
                         </div>
                     </div>
@@ -1283,7 +1283,7 @@ def page_dashboard():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_new_audit():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--st-section-color,#0F172A)'>🚀 New Audit</h2>",
+    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🚀 New Audit</h2>",
                 unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["Single URL", "Bulk Upload (CSV/XLSX)", "Sitemap XML"])
@@ -1396,7 +1396,7 @@ def page_new_audit():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_results():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--st-section-color,#0F172A)'>📋 Audit Results</h2>",
+    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📋 Audit Results</h2>",
                 unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
@@ -1498,7 +1498,7 @@ def page_url_detail():
         color = _score_color(score)
         st.markdown(f"""<div style='text-align:center'>
             <div style='font-size:2.4rem;font-weight:800;color:{color}'>{score}</div>
-            <div style='font-size:.75rem;color:var(--st-muted,#64748B)'>/ 100</div>
+            <div style='font-size:.75rem;color:var(--seo-muted,#64748B)'>/ 100</div>
             <span class='{_score_class(score)} score-badge'>{_score_label(score)}</span>
             </div>""", unsafe_allow_html=True)
     with hc3: metric_card("Total Issues", len(issues), "#6366F1")
@@ -1532,7 +1532,7 @@ def page_url_detail():
                 st.markdown(
                     f"""<div style='display:flex;justify-content:space-between;
                     padding:6px 0;border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15))'>
-                    <span style='font-size:.85rem;color:var(--st-body-text,#374151)'>{k.replace("_"," ").title()}</span>
+                    <span style='font-size:.85rem;color:var(--seo-text,#374151)'>{k.replace("_"," ").title()}</span>
                     <span style='font-weight:700;color:{_score_color(v)}'>{v:.0f}</span></div>""",
                     unsafe_allow_html=True)
 
@@ -1672,27 +1672,27 @@ def page_url_detail():
                         crit_html += (
                             f"<tr><td style='padding:5px 10px;font-weight:600;color:#1E40AF;"
                             f"font-size:.78rem;white-space:nowrap'>{rk}</td>"
-                            f"<td style='padding:5px 10px;font-size:.76rem;color:var(--st-body-text,#374151);"
+                            f"<td style='padding:5px 10px;font-size:.76rem;color:var(--seo-text,#374151);"
                             f"word-break:break-all'>{rv}</td></tr>"
                         )
                         shown.add(rk.lower())
                         break
             other_html = "".join(
-                f"<tr><td style='padding:4px 10px;font-size:.74rem;color:var(--st-muted,#64748B);"
+                f"<tr><td style='padding:4px 10px;font-size:.74rem;color:var(--seo-muted,#64748B);"
                 f"white-space:nowrap'>{rk}</td>"
                 f"<td style='padding:4px 10px;font-size:.73rem;color:#475569;"
                 f"word-break:break-all'>{rv}</td></tr>"
                 for rk, rv in _raw_h.items() if rk.lower() not in shown
             )
             st.markdown(
-                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--st-card-border,rgba(148,163,184,.22))'>"
-                f"<table style='width:100%;border-collapse:collapse;background:var(--st-card-bg,#fff)'>"
+                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>"
+                f"<table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>"
                 f"<thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'><tr>"
-                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--st-muted,#1E40AF)'>Header</th>"
-                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--st-muted,#1E40AF)'>Value</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--seo-muted,#1E40AF)'>Header</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:var(--seo-muted,#1E40AF)'>Value</th>"
                 f"</tr></thead><tbody>{crit_html}"
                 f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:#94A3B8;"
-                f"background:var(--st-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
+                f"background:var(--seo-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
                 f"{other_html}</tbody></table></div>",
                 unsafe_allow_html=True,
             )
@@ -1724,7 +1724,7 @@ def page_url_detail():
                 f"background:{sbg};border-radius:7px;margin-bottom:5px'>"
                 f"<span style='font-size:1rem'>{sicon}</span>"
                 f"<span style='font-weight:600;font-size:.82rem;color:{sfg};min-width:220px'>{sname}</span>"
-                f"<span style='font-size:.76rem;color:var(--st-body-text,#374151)'>{sdetail}</span>"
+                f"<span style='font-size:.76rem;color:var(--seo-text,#374151)'>{sdetail}</span>"
                 f"</div>", unsafe_allow_html=True)
 
         # Resource Analysis
@@ -1789,15 +1789,15 @@ def page_url_detail():
                         <div style='padding:10px 14px;background:{_sev_bg(sev)};border-radius:8px;
                         margin-bottom:8px;border-left:4px solid {_sev_color(sev)}'>
                             <div style='display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px'>
-                                <span style='font-weight:700;font-size:.88rem;color:var(--st-section-color,#0F172A)'>{iss.get("issue","")}</span>
+                                <span style='font-weight:700;font-size:.88rem;color:var(--seo-heading,#0F172A)'>{iss.get("issue","")}</span>
                                 <div style='display:flex;gap:6px'>
                                     <span style='background:{_sev_color(sev)};color:white;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700'>{sev}</span>
                                     <span style='background:#1E3A5F;color:#93C5FD;padding:2px 8px;border-radius:4px;font-size:.72rem'>Impact: {imp}/10</span>
                                     <span style='background:#1E293B;color:#CBD5E1;padding:2px 8px;border-radius:4px;font-size:.72rem'>Effort: {eff}</span>
                                 </div>
                             </div>
-                            <div style='font-size:.75rem;color:var(--st-muted,#64748B);margin-top:3px'>📂 {iss.get("category","")}</div>
-                            <div style='font-size:.83rem;color:var(--st-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
+                            <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>📂 {iss.get("category","")}</div>
+                            <div style='font-size:.83rem;color:var(--seo-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
     # Tab 5 — Links (Ahrefs-style)
@@ -1931,16 +1931,16 @@ def page_url_detail():
                 <div style='padding:12px 16px;background:{_sev_bg(sev)};border-radius:10px;
                 margin-bottom:10px;border-left:4px solid {_sev_color(sev)}'>
                     <div style='display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px'>
-                        <span style='font-weight:700;font-size:.9rem;color:var(--st-section-color,#0F172A)'>{i}. {iss.get("issue","")}</span>
+                        <span style='font-weight:700;font-size:.9rem;color:var(--seo-heading,#0F172A)'>{i}. {iss.get("issue","")}</span>
                         <div style='display:flex;gap:6px;align-items:center'>
                             <div style='background:rgba(148,163,184,.25);border-radius:4px;overflow:hidden;width:70px;height:8px'>
                                 <div style='background:{_sev_color(sev)};width:{imp*10}%;height:100%'></div>
                             </div>
                             <span style='font-size:.78rem;font-weight:700;color:{_sev_color(sev)}'>{imp}/10</span>
-                            <span style='font-size:.75rem;color:var(--st-muted,#64748B)'>Effort: {eff}</span>
+                            <span style='font-size:.75rem;color:var(--seo-muted,#64748B)'>Effort: {eff}</span>
                         </div>
                     </div>
-                    <div style='font-size:.76rem;color:var(--st-muted,#64748B);margin:3px 0'>📂 {iss.get("category","")} • {sev}</div>
+                    <div style='font-size:.76rem;color:var(--seo-muted,#64748B);margin:3px 0'>📂 {iss.get("category","")} • {sev}</div>
                     <div style='font-size:.84rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                 </div>""", unsafe_allow_html=True)
 
@@ -1950,7 +1950,7 @@ def page_url_detail():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_link_analysis():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--st-section-color,#0F172A)'>🔗 Link Analysis</h2>",
+    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🔗 Link Analysis</h2>",
                 unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
@@ -2033,7 +2033,7 @@ def page_link_analysis():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_export():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--st-section-color,#0F172A)'>📤 Export Reports</h2>",
+    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📤 Export Reports</h2>",
                 unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
