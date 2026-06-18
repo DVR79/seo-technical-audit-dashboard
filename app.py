@@ -177,7 +177,14 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         filtered = [l for l in filtered
                     if sq in l.get("url","").lower() or sq in (l.get("anchor_text","") or "").lower()]
 
-    st.caption(f"Showing **{min(len(filtered), max_rows)}** of {len(filtered)} links")
+    st.caption(
+        f"Showing **{min(len(filtered), max_rows)}** of {len(filtered)} links &nbsp;|&nbsp; "
+        f"Anchor: "
+        f"<span style='background:#DBEAFE;color:#1E40AF;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Descriptive (3+ words)</span> &nbsp;"
+        f"<span style='background:#FEF3C7;color:#92400E;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Short / Generic</span> &nbsp;"
+        f"<span style='background:#F1F5F9;color:#475569;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>No Anchor</span>",
+        unsafe_allow_html=True
+    )
 
     rows_html = ""
     for lk in filtered[:max_rows]:
@@ -201,17 +208,28 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         source_col = (f"<td style='padding:7px 10px;font-size:.72rem;color:var(--seo-muted,#64748B);max-width:130px;word-break:break-all'>"
                       f"{lk.get('source','')[:60]}</td>") if show_source else ""
 
-        # Anchor keyword chip — bright if real anchor, dim if missing
+        # Anchor keyword chip — color-coded like other badges
+        # Blue  = good descriptive anchor (≥3 words)
+        # Yellow = short/generic anchor (1–2 words)
+        # Gray  = no anchor text at all
         if is_no_anchor:
-            anchor_chip = "<span style='font-size:.72rem;color:#94A3B8;font-style:italic'>[No Anchor]</span>"
+            anc_bg, anc_fg = "#F1F5F9", "#475569"
+            anc_label = "[No Anchor]"
+            anc_title = "No anchor text — add descriptive keyword text to this link"
+        elif len(anchor_display.split()) >= 3:
+            anc_bg, anc_fg = "#DBEAFE", "#1E40AF"   # blue — descriptive keyword phrase
+            anc_label = short_anc
+            anc_title = anchor_display
         else:
-            anchor_chip = (
-                f"<span style='display:inline-block;background:rgba(99,102,241,.12);color:#6366F1;"
-                f"border:1px solid rgba(99,102,241,.3);border-radius:4px;padding:2px 7px;"
-                f"font-size:.74rem;font-weight:600;max-width:200px;overflow:hidden;"
-                f"text-overflow:ellipsis;white-space:nowrap;vertical-align:middle'"
-                f" title='{anchor_display}'>{short_anc}</span>"
-            )
+            anc_bg, anc_fg = "#FEF3C7", "#92400E"   # yellow — short/generic anchor
+            anc_label = short_anc
+            anc_title = anchor_display
+        anchor_chip = (
+            f"<span style='display:inline-block;background:{anc_bg};color:{anc_fg};"
+            f"border-radius:4px;padding:2px 8px;font-size:.72rem;font-weight:700;"
+            f"max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            f"vertical-align:middle' title='{anc_title}'>{anc_label}</span>"
+        )
 
         rows_html += f"""
         <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15));'>
