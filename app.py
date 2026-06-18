@@ -124,7 +124,7 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         return
 
     # Filter controls — keys must be stable across reruns (no id(obj) which changes every run)
-    fc1, fc2, fc3 = st.columns([2, 2, 2])
+    fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 2])
     with fc1:
         filter_rel = st.selectbox(
             "Filter by Rel",
@@ -138,7 +138,13 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
             key=f"{key_prefix}_hlt_f"
         )
     with fc3:
-        search_q = st.text_input("Search URL / Anchor", key=f"{key_prefix}_srch_f")
+        filter_anchor = st.selectbox(
+            "Anchor Text",
+            ["All", "Has Anchor", "No Anchor"],
+            key=f"{key_prefix}_anc_f"
+        )
+    with fc4:
+        search_q = st.text_input("Search URL / Keyword", placeholder="Type URL or anchor keyword…", key=f"{key_prefix}_srch_f")
 
     filtered = links
     if filter_rel == "Dofollow":
@@ -161,17 +167,24 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
     elif filter_health == "Not Checked":
         filtered = [l for l in filtered if l.get("health") == "unknown"]
 
+    if filter_anchor == "Has Anchor":
+        filtered = [l for l in filtered if (l.get("anchor_text") or "").strip()]
+    elif filter_anchor == "No Anchor":
+        filtered = [l for l in filtered if not (l.get("anchor_text") or "").strip()]
+
     if search_q:
         sq = search_q.lower()
         filtered = [l for l in filtered
-                    if sq in l.get("url","").lower() or sq in l.get("anchor_text","").lower()]
+                    if sq in l.get("url","").lower() or sq in (l.get("anchor_text","") or "").lower()]
 
     st.caption(f"Showing **{min(len(filtered), max_rows)}** of {len(filtered)} links")
 
     rows_html = ""
     for lk in filtered[:max_rows]:
         url    = lk.get("url","")
-        anchor = lk.get("anchor_text","[No Anchor]") or "[No Anchor]"
+        anchor = lk.get("anchor_text","") or ""
+        anchor_display = anchor.strip() if anchor.strip() else "[No Anchor]"
+        is_no_anchor   = not anchor.strip()
         health = lk.get("health","unknown")
         sl     = lk.get("status_label") or ("Not Checked" if lk.get("status_code") is None else str(lk.get("status_code","")))
         hbadge = _health_badge(health, sl)
@@ -183,19 +196,31 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         )
         new_tab = "🔗" if lk.get("opens_new_tab") else ""
         noop    = "" if lk.get("has_noopener") else ("⚠️" if lk.get("opens_new_tab") else "")
-        short_url = url[:70] + ("…" if len(url) > 70 else "")
-        short_anc = anchor[:55] + ("…" if len(anchor) > 55 else "")
-        source_col = (f"<td style='font-size:.72rem;color:var(--seo-muted,#64748B);max-width:130px;word-break:break-all'>"
+        short_url = url[:65] + ("…" if len(url) > 65 else "")
+        short_anc = anchor_display[:50] + ("…" if len(anchor_display) > 50 else "")
+        source_col = (f"<td style='padding:7px 10px;font-size:.72rem;color:var(--seo-muted,#64748B);max-width:130px;word-break:break-all'>"
                       f"{lk.get('source','')[:60]}</td>") if show_source else ""
+
+        # Anchor keyword chip — bright if real anchor, dim if missing
+        if is_no_anchor:
+            anchor_chip = "<span style='font-size:.72rem;color:#94A3B8;font-style:italic'>[No Anchor]</span>"
+        else:
+            anchor_chip = (
+                f"<span style='display:inline-block;background:rgba(99,102,241,.12);color:#6366F1;"
+                f"border:1px solid rgba(99,102,241,.3);border-radius:4px;padding:2px 7px;"
+                f"font-size:.74rem;font-weight:600;max-width:200px;overflow:hidden;"
+                f"text-overflow:ellipsis;white-space:nowrap;vertical-align:middle'"
+                f" title='{anchor_display}'>{short_anc}</span>"
+            )
 
         rows_html += f"""
         <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15));'>
             {source_col}
-            <td style='padding:7px 10px;max-width:260px;word-break:break-all'>
+            <td style='padding:7px 10px;max-width:220px;word-break:break-all'>
                 <a href='{url}' target='_blank' style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none'
                    title='{url}'>{short_url}</a>
-                <div style='font-size:.7rem;color:#94A3B8;margin-top:2px'>{short_anc}</div>
             </td>
+            <td style='padding:7px 10px;max-width:220px'>{anchor_chip}</td>
             <td style='padding:7px 10px;text-align:center'>{rbadge}</td>
             <td style='padding:7px 10px;text-align:center'>{hbadge}</td>
             <td style='padding:7px 10px;text-align:center;font-size:.75rem;color:var(--seo-muted,#64748B)'>{new_tab} {noop}</td>
@@ -208,7 +233,8 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         <thead style='background:var(--seo-card-bg,#F8FAFC)'>
             <tr>
                 {source_th}
-                <th style='padding:8px 10px;text-align:left;color:var(--seo-text,#374151);font-size:.78rem'>Target URL / Anchor Text</th>
+                <th style='padding:8px 10px;text-align:left;color:var(--seo-text,#374151);font-size:.78rem'>Target URL</th>
+                <th style='padding:8px 10px;text-align:left;color:var(--seo-text,#374151);font-size:.78rem'>Anchor Text (Keyword)</th>
                 <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Link Type</th>
                 <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Status</th>
                 <th style='padding:8px 10px;text-align:center;color:var(--seo-text,#374151);font-size:.78rem'>Tab / Security</th>
