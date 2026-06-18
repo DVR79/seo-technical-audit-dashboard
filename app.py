@@ -2224,28 +2224,30 @@ def page_link_analysis():
 
         # ── Filtered link table driven by card clicks ─────────────────────
         ov_filter = st.session_state.get("la_ov_filter")
-        if ov_filter:
+        # Only react to overview-level filters (fkind "int"/"ext"); ignore tab-specific fkinds
+        if ov_filter and ov_filter[0] in ("int", "ext"):
             fkind, fkey = ov_filter
             src_links = all_int_links if fkind == "int" else all_ext_links
             label_map = {
-                "all":       ("All Links",          src_links),
-                "unique":    ("Unique URLs",         list({l["url"]: l for l in src_links}.values())),
-                "dofollow":  ("Dofollow Links",      [l for l in src_links if l.get("is_dofollow")]),
-                "nofollow":  ("Nofollow Links",      [l for l in src_links if l.get("is_nofollow")]),
-                "broken":    ("Broken Links",        [l for l in src_links if l.get("health") == "broken"]),
-                "redirect":  ("Redirecting Links",   [l for l in src_links if l.get("health") == "redirect"]),
-                "blocked":   ("Blocked Links",       [l for l in src_links if l.get("health") == "blocked"]),
-                "new_tab":   ("New Tab Links",       [l for l in src_links if l.get("opens_new_tab")]),
-                "no_security":("No Noopener Links",  [l for l in src_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
-                "weak":      ("Weak Anchor Links",   [l for l in src_links if not (l.get("anchor_text") or "").strip() or len((l.get("anchor_text") or "").split()) < 2]),
+                "all":        ("All Links",             src_links),
+                "unique":     ("Unique URLs",            list({l["url"]: l for l in src_links}.values())),
+                "dofollow":   ("Dofollow Links",         [l for l in src_links if l.get("is_dofollow")]),
+                "nofollow":   ("Nofollow Links",         [l for l in src_links if l.get("is_nofollow")]),
+                "broken":     ("Broken Links",           [l for l in src_links if l.get("health") == "broken"]),
+                "redirect":   ("Redirecting Links",      [l for l in src_links if l.get("health") == "redirect"]),
+                "blocked":    ("Blocked Links",          [l for l in src_links if l.get("health") == "blocked"]),
+                "new_tab":    ("New Tab Links",          [l for l in src_links if l.get("opens_new_tab")]),
+                "no_security":("Missing Noopener Links", [l for l in src_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+                "weak":       ("Weak Anchor Links",      [l for l in src_links if l.get("is_weak_anchor")]),
             }
             section_label, filtered_links = label_map.get(fkey, ("Links", src_links))
             kind_label = "Internal" if fkind == "int" else "External"
+            kind_icon  = "🔵" if fkind == "int" else "🟣"
             st.markdown("---")
             st.markdown(
                 f"<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>"
                 f"<span style='font-size:1rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
-                f"{'🔵' if fkind=='int' else '🟣'} {kind_label}: {section_label}</span>"
+                f"{kind_icon} {kind_label}: {section_label}</span>"
                 f"<span style='background:#F1F5F9;color:#475569;padding:2px 8px;border-radius:12px;"
                 f"font-size:.75rem;font-weight:600'>{len(filtered_links)} links</span>"
                 f"</div>",
@@ -2262,11 +2264,11 @@ def page_link_analysis():
         # Link health donut charts side-by-side
         ov1, ov2, ov3 = st.columns(3)
         with ov1:
-            i_ok  = i_total - i_broken - i_redir
+            i_ok      = sum(1 for l in all_int_links if l.get("health") == "ok")
+            i_unknown = sum(1 for l in all_int_links if l.get("health") == "unknown")
             fig_i = go.Figure(go.Pie(
-                labels=["OK", "Broken", "Redirecting", "Unknown"],
-                values=[max(i_ok,0), i_broken, i_redir,
-                        max(i_total - i_broken - i_redir, 0) if i_total and not (i_broken + i_redir) else 0],
+                labels=["OK", "Broken", "Redirecting", "Not Checked"],
+                values=[i_ok, i_broken, i_redir, i_unknown],
                 hole=0.55,
                 marker_colors=["#10B981","#EF4444","#F59E0B","#94A3B8"],
             ))
@@ -2353,12 +2355,14 @@ def page_link_analysis():
 
         # Tab behavior breakdown — clickable cards
         st.markdown('<div class="section-header">🖱️ Tab Behavior & Security</div>', unsafe_allow_html=True)
-        sec_clr = "#10B981" if i_miss_no == 0 else "#EF4444"
+        sec_clr    = "#10B981" if i_miss_no == 0 else "#EF4444"
+        i_same_tab = sum(1 for l in all_int_links if not l.get("opens_new_tab"))
+        i_secure   = sum(1 for l in all_int_links if l.get("opens_new_tab") and l.get("has_noopener"))
         _int_tab_cards = [
-            ("Same Tab",         i_total - i_new_tab, "#3B82F6", "int_tab", "same_tab",      [l for l in all_int_links if not l.get("opens_new_tab")]),
-            ("New Tab",          i_new_tab,            "#8B5CF6", "int_tab", "new_tab",       [l for l in all_int_links if l.get("opens_new_tab")]),
-            ("Missing noopener", i_miss_no,            sec_clr,   "int_tab", "miss_noopener", [l for l in all_int_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
-            ("Secure New Tab",   i_new_tab - i_miss_no,"#10B981", "int_tab", "secure_tab",   [l for l in all_int_links if l.get("opens_new_tab") and l.get("has_noopener")]),
+            ("Same Tab",         i_same_tab, "#3B82F6", "int_tab", "same_tab",      [l for l in all_int_links if not l.get("opens_new_tab")]),
+            ("New Tab",          i_new_tab,  "#8B5CF6", "int_tab", "new_tab",        [l for l in all_int_links if l.get("opens_new_tab")]),
+            ("Missing noopener", i_miss_no,  sec_clr,   "int_tab", "miss_noopener",  [l for l in all_int_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+            ("Secure New Tab",   i_secure,   "#10B981", "int_tab", "secure_tab",     [l for l in all_int_links if l.get("opens_new_tab") and l.get("has_noopener")]),
         ]
         tb1, tb2, tb3, tb4 = st.columns(4)
         for col, (label, val, clr, fkind, fkey, _) in zip([tb1,tb2,tb3,tb4], _int_tab_cards):
@@ -2414,14 +2418,15 @@ def page_link_analysis():
 
         # Security attributes breakdown — clickable cards
         st.markdown('<div class="section-header">🔒 Security Attributes Analysis</div>', unsafe_allow_html=True)
-        e_same_tab = e_total - e_new_tab
-        e_full_sec = e_new_tab - e_no_sec
+        e_same_tab  = e_total - e_new_tab
+        # Fully secure = opens_new_tab AND has both noopener + noreferrer
+        e_full_sec  = sum(1 for l in all_ext_links if l.get("opens_new_tab") and l.get("has_noopener") and l.get("has_noreferrer"))
         _ext_sec_cards = [
-            ("Same Tab",         e_same_tab, "#3B82F6", "ext_tab", "e_same_tab",    [l for l in all_ext_links if not l.get("opens_new_tab")]),
-            ("New Tab",          e_new_tab,  "#8B5CF6", "ext_tab", "e_new_tab",     [l for l in all_ext_links if l.get("opens_new_tab")]),
-            ("Has noopener",     e_full_sec, "#10B981", "ext_tab", "e_has_noopener",[l for l in all_ext_links if l.get("opens_new_tab") and l.get("has_noopener")]),
-            ("Missing noopener", e_miss_no,  "#F97316", "ext_tab", "e_miss_no",     [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
-            ("Missing both",     e_no_sec,   "#EF4444", "ext_tab", "e_no_sec",      [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+            ("Same Tab",           e_same_tab, "#3B82F6", "ext_tab", "e_same_tab",      [l for l in all_ext_links if not l.get("opens_new_tab")]),
+            ("New Tab",            e_new_tab,  "#8B5CF6", "ext_tab", "e_new_tab",        [l for l in all_ext_links if l.get("opens_new_tab")]),
+            ("Fully Secure",       e_full_sec, "#10B981", "ext_tab", "e_has_noopener",   [l for l in all_ext_links if l.get("opens_new_tab") and l.get("has_noopener") and l.get("has_noreferrer")]),
+            ("Missing noopener",   e_miss_no,  "#F97316", "ext_tab", "e_miss_no",        [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+            ("Missing both",       e_no_sec,   "#EF4444", "ext_tab", "e_no_sec",         [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener") and not l.get("has_noreferrer")]),
         ]
         sa1, sa2, sa3, sa4, sa5 = st.columns(5)
         for col, (label, val, clr, fkind, fkey, _) in zip([sa1,sa2,sa3,sa4,sa5], _ext_sec_cards):
