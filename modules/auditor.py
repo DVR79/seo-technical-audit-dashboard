@@ -419,7 +419,8 @@ def detect_page_type(url, soup):
     return "general"
 
 
-def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
+def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
+              fetch_pagespeed=False, psi_api_key=None):
     result = {
         "url": url,
         "audit_timestamp": datetime.now().isoformat(),
@@ -510,12 +511,20 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
     # Expose technical_seo sub-dict at top level for easy access
     result["technical_seo"] = result["advanced"].get("technical_seo", {})
 
+    # ── Optional PageSpeed Insights API call ─────────────────────────────
+    pagespeed_data = None
+    if fetch_pagespeed:
+        from modules.pagespeed import fetch_pagespeed as _fetch_psi
+        pagespeed_data = _fetch_psi(url, strategy="mobile", api_key=psi_api_key)
+    result["pagespeed"] = pagespeed_data or {}
+
     from modules.mobile_auditor import analyze_mobile
     result["mobile_audit"] = analyze_mobile(
         soup,
         base_url=url,
         technical_seo=result["technical_seo"],
         advanced_data=result["advanced"],
+        pagespeed=pagespeed_data,
     )
 
     if audit_type == "auto":
@@ -550,7 +559,8 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
 
 
 def audit_urls_bulk(urls, audit_type="auto", check_links=True, validate_links=False,
-                    max_workers=8, progress_callback=None):
+                    max_workers=8, progress_callback=None,
+                    fetch_pagespeed=False, psi_api_key=None):
     import threading
     results = []
     completed = 0
@@ -558,8 +568,13 @@ def audit_urls_bulk(urls, audit_type="auto", check_links=True, validate_links=Fa
     total = len(urls)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(audit_url, url, audit_type, check_links, validate_links): url
-                   for url in urls}
+        futures = {
+            executor.submit(
+                audit_url, url, audit_type, check_links, validate_links,
+                fetch_pagespeed, psi_api_key
+            ): url
+            for url in urls
+        }
         for future in as_completed(futures):
             url = futures[future]
             try:

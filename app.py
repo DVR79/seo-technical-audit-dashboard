@@ -1298,6 +1298,16 @@ def page_new_audit():
             help="Discover all internal and external links on the page.")
         validate_links = st.toggle("Validate Link Status Codes", value=True,
             help="HTTP-check every link and show status codes (like Ahrefs). Adds ~10-30s per page.")
+        fetch_psi      = st.toggle("🚀 Fetch Real PageSpeed Insights", value=False,
+            help="Call Google PageSpeed Insights API for accurate Lighthouse scores (Performance, CWV). Adds ~15s per URL.")
+        psi_api_key    = ""
+        if fetch_psi:
+            psi_api_key = st.text_input(
+                "PSI API Key (optional — leave blank for anonymous)",
+                type="password",
+                help="Get a free key at console.cloud.google.com → PageSpeed Insights API. Anonymous limit: ~100 req/day.",
+            )
+            st.caption("📡 Real Lighthouse scores will appear in the **Mobile Audit → Core Web Vitals** tab.")
         max_workers    = st.slider("Concurrent Workers", 2, 16, 6)
         if validate_links:
             st.caption("🔍 Status validation ON — links will show 200/301/403/404/999 etc.")
@@ -1322,8 +1332,10 @@ def page_new_audit():
             elif not single_url.strip().startswith("http"):
                 st.warning("URL must start with http:// or https://")
             else:
-                with st.spinner(f"Auditing {single_url} …"):
-                    result = audit_url(single_url.strip(), atype, check_links, validate_links)
+                spinner_msg = f"Auditing {single_url} …" + (" + PageSpeed Insights (15s)" if fetch_psi else "")
+                with st.spinner(spinner_msg):
+                    result = audit_url(single_url.strip(), atype, check_links, validate_links,
+                                       fetch_pagespeed=fetch_psi, psi_api_key=psi_api_key or None)
                 existing = [r["url"] for r in st.session_state.audit_results]
                 if single_url.strip() in existing:
                     st.session_state.audit_results[existing.index(single_url.strip())] = result
@@ -1355,7 +1367,8 @@ def page_new_audit():
                         bar.progress(done/tot)
                         stat.text(f"Auditing URL {done}/{tot} …")
                     new_res = audit_urls_bulk(urls, atype, check_links, validate_links,
-                                             max_workers=max_workers, progress_callback=upd_b)
+                                             max_workers=max_workers, progress_callback=upd_b,
+                                             fetch_pagespeed=fetch_psi, psi_api_key=psi_api_key or None)
                     bar.progress(1.0); stat.text("Done!")
                     st.session_state.audit_results   = new_res + st.session_state.audit_results
                     st.session_state.last_audit_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1384,7 +1397,8 @@ def page_new_audit():
                             bar.progress(done/tot)
                             stat.text(f"Auditing URL {done}/{tot} …")
                         new_res = audit_urls_bulk(chosen, atype, check_links, validate_links,
-                                                 max_workers=max_workers, progress_callback=upd_s)
+                                                 max_workers=max_workers, progress_callback=upd_s,
+                                                 fetch_pagespeed=fetch_psi, psi_api_key=psi_api_key or None)
                         bar.progress(1.0); stat.text("Done!")
                         st.session_state.audit_results   = new_res + st.session_state.audit_results
                         st.session_state.last_audit_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -2676,9 +2690,64 @@ def page_mobile_audit():
                 </div>""", unsafe_allow_html=True)
                 st.caption(desc)
 
+        # Source badge
+        cwv_source = cwv.get("source", "Heuristic Estimate")
+        is_real = "PageSpeed" in cwv_source
+        src_clr = "#10B981" if is_real else "#F59E0B"
+        src_icon = "✅" if is_real else "⚠️"
+        st.markdown(f"""
+        <div style='background:var(--seo-card-bg,#fff);border:1px solid {src_clr};
+             border-radius:8px;padding:8px 14px;margin:12px 0;display:inline-flex;
+             align-items:center;gap:8px'>
+            <span style='font-size:.85rem'>{src_icon}</span>
+            <span style='font-size:.78rem;font-weight:600;color:{src_clr}'>{cwv_source}</span>
+            {"" if is_real else "<span style='font-size:.72rem;color:var(--seo-muted,#64748B)'>&nbsp;— Enable 🚀 PageSpeed Insights in New Audit for real Lighthouse data</span>"}
+        </div>""", unsafe_allow_html=True)
+
+        # Extra PSI-only metrics (TBT, Speed Index)
+        if is_real:
+            tbt_d = cwv.get("tbt", {})
+            si_d  = cwv.get("si",  {})
+            if tbt_d.get("value","—") != "—" or si_d.get("value","—") != "—":
+                ex1, ex2 = st.columns(2)
+                for col, (lbl, metric_d, desc) in zip(
+                    [ex1, ex2],
+                    [
+                        ("TBT — Total Blocking Time", tbt_d, "< 200ms Good · 200–600ms Needs Improvement · > 600ms Poor"),
+                        ("SI — Speed Index",          si_d,  "< 3.4s Good · 3.4–5.8s Needs Improvement · > 5.8s Poor"),
+                    ]
+                ):
+                    clr = _cwv_status_color.get(metric_d.get("status","info"), "#94A3B8")
+                    with col:
+                        st.markdown(f"""
+                        <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                             border-radius:10px;padding:12px;text-align:center;margin-top:4px'>
+                            <div style='font-size:.7rem;font-weight:700;color:var(--seo-muted,#64748B)'>{lbl}</div>
+                            <div style='font-size:1.2rem;font-weight:800;color:{clr};margin:6px 0'>{metric_d.get("value","—")}</div>
+                            <div style='font-size:.65rem;color:var(--seo-muted,#64748B)'>{desc}</div>
+                        </div>""", unsafe_allow_html=True)
+
+            # Opportunities from PSI
+            opps = cwv.get("opportunities", [])
+            if opps:
+                st.markdown('<div class="section-header" style="margin-top:16px">💡 Lighthouse Opportunities</div>',
+                            unsafe_allow_html=True)
+                for opp in opps:
+                    score = opp.get("score", 1) or 1
+                    opp_clr = "#EF4444" if score < 0.5 else "#F59E0B"
+                    st.markdown(f"""
+                    <div style='background:var(--seo-card-bg,#fff);border-left:4px solid {opp_clr};
+                         border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:6px;
+                         border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+                        <div style='font-weight:700;font-size:.83rem;color:var(--seo-heading,#0F172A)'>
+                            {opp.get("title","")}</div>
+                        {"<div style='font-size:.75rem;color:var(--seo-info-text,#1D4ED8);margin-top:3px'>" + opp.get("displayValue","") + "</div>" if opp.get("displayValue") else ""}
+                    </div>""", unsafe_allow_html=True)
+
         # Performance score gauge
-        ps = cwv.get("perf_score", 0)
-        ps_clr = "#10B981" if ps >= 80 else "#F59E0B" if ps >= 60 else "#EF4444"
+        ps = cwv.get("perf_score", 0) or 0
+        ps_clr = "#10B981" if ps >= 90 else "#F59E0B" if ps >= 50 else "#EF4444"
+        gauge_title = "Lighthouse Performance Score" if is_real else "Heuristic Performance Score"
         fig_ps = go.Figure(go.Indicator(
             mode="gauge+number",
             value=ps,
@@ -2688,14 +2757,15 @@ def page_mobile_audit():
                 "bar": {"color":ps_clr,"thickness":0.28},
                 "steps":[
                     {"range":[0,50], "color":"rgba(239,68,68,.12)"},
-                    {"range":[50,80],"color":"rgba(245,158,11,.12)"},
-                    {"range":[80,100],"color":"rgba(16,185,129,.12)"},
+                    {"range":[50,89],"color":"rgba(245,158,11,.12)"},
+                    {"range":[89,100],"color":"rgba(16,185,129,.12)"},
                 ],
+                "threshold": {"line":{"color":"#10B981","width":3},"thickness":0.75,"value":90},
             },
         ))
-        fig_ps.update_layout(height=200, margin=dict(t=20,b=5,l=20,r=20),
+        fig_ps.update_layout(height=220, margin=dict(t=30,b=5,l=20,r=20),
                              paper_bgcolor="rgba(0,0,0,0)", font_color="gray",
-                             title={"text":"Heuristic Performance Score","font":{"size":13}})
+                             title={"text": gauge_title, "font":{"size":13}})
         st.plotly_chart(fig_ps, use_container_width=True)
 
     # ── Tab: Issues ───────────────────────────────────────────────────────

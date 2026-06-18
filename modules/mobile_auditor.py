@@ -393,15 +393,36 @@ def _check_content_wider_screen(soup):
 # Core Web Vitals helpers
 # ---------------------------------------------------------------------------
 
-def _parse_cwv(technical_seo):
-    """Extract CWV estimates from technical_seo dict."""
+def _parse_cwv(technical_seo, pagespeed=None):
+    """
+    Extract CWV data.
+    If pagespeed (PSI API result) is provided and successful, use real Lighthouse values.
+    Otherwise fall back to heuristic estimates from the HTML/response analysis.
+    """
+    # ── Real Lighthouse data (PageSpeed Insights API) ─────────────────────
+    if pagespeed and pagespeed.get("success"):
+        ps = pagespeed
+        return {
+            "ttfb":       ps.get("ttfb", {"value": "—", "status": "info"}),
+            "lcp":        ps.get("lcp",  {"value": "—", "status": "info"}),
+            "cls":        ps.get("cls",  {"value": "—", "status": "info"}),
+            "fcp":        ps.get("fcp",  {"value": "—", "status": "info"}),
+            "tbt":        ps.get("tbt",  {"value": "—", "status": "info"}),
+            "si":         ps.get("si",   {"value": "—", "status": "info"}),
+            "inp":        ps.get("inp",  {"value": "Not available", "status": "info"}),
+            "perf_score": ps.get("performance_score", 0) or 0,
+            "source":     "PageSpeed Insights (Lighthouse)",
+            "opportunities": ps.get("opportunities", []),
+        }
+
+    # ── Heuristic fallback ────────────────────────────────────────────────
     ts = technical_seo or {}
 
     ttfb = ts.get("cwv_ttfb_estimate", "Unknown")
-    lcp = ts.get("cwv_lcp_estimate", "Unknown")
-    cls = ts.get("cwv_cls_risk", "Unknown")
+    lcp  = ts.get("cwv_lcp_estimate",  "Unknown")
+    cls  = ts.get("cwv_cls_risk",      "Unknown")
     perf_score = ts.get("performance_score", 0)
-    ttfb_ms = ts.get("cwv_ttfb_ms", 0)
+    ttfb_ms    = ts.get("cwv_ttfb_ms", 0)
 
     def _rating(value, good_label="Good", warn_label="Needs Improvement"):
         if value in ("Good", good_label):
@@ -412,29 +433,29 @@ def _parse_cwv(technical_seo):
             return "fail"
         return "info"
 
-    # FCP estimated from TTFB
     try:
         ttfb_ms_val = float(ttfb_ms)
     except (TypeError, ValueError):
         ttfb_ms_val = 0
 
     if ttfb_ms_val < 200:
-        fcp_label = "Good"
-        fcp_status = "pass"
+        fcp_label, fcp_status = "Good", "pass"
     elif ttfb_ms_val < 500:
-        fcp_label = "Needs Improvement"
-        fcp_status = "warning"
+        fcp_label, fcp_status = "Needs Improvement", "warning"
     else:
-        fcp_label = "Poor"
-        fcp_status = "fail"
+        fcp_label, fcp_status = "Poor", "fail"
 
     return {
         "ttfb": {"value": ttfb, "status": _rating(ttfb)},
-        "lcp": {"value": lcp, "status": _rating(lcp)},
-        "cls": {"value": cls, "status": _rating(cls, good_label="Low", warn_label="Medium")},
-        "fcp": {"value": fcp_label, "status": fcp_status},
-        "inp": {"value": "Requires Browser Measurement", "status": "info"},
+        "lcp":  {"value": lcp,  "status": _rating(lcp)},
+        "cls":  {"value": cls,  "status": _rating(cls, good_label="Low", warn_label="Medium")},
+        "fcp":  {"value": fcp_label, "status": fcp_status},
+        "tbt":  {"value": "—", "status": "info"},
+        "si":   {"value": "—", "status": "info"},
+        "inp":  {"value": "Requires Browser Measurement", "status": "info"},
         "perf_score": perf_score,
+        "source": "Heuristic Estimate",
+        "opportunities": [],
     }
 
 
@@ -571,7 +592,7 @@ def _build_issues(checks, summary):
 # Public API
 # ---------------------------------------------------------------------------
 
-def analyze_mobile(soup, base_url="", technical_seo=None, advanced_data=None):
+def analyze_mobile(soup, base_url="", technical_seo=None, advanced_data=None, pagespeed=None):
     """
     Mobile SEO and responsiveness analysis.
 
@@ -621,8 +642,8 @@ def analyze_mobile(soup, base_url="", technical_seo=None, advanced_data=None):
     high_or_critical = any(i["severity"] in ("Critical", "High") for i in issues)
     is_mobile_friendly = not high_or_critical
 
-    # CWV section
-    cwv = _parse_cwv(technical_seo)
+    # CWV section — real PSI data if available, otherwise heuristics
+    cwv = _parse_cwv(technical_seo, pagespeed=pagespeed)
 
     # Summary counts
     check_map = {c["id"]: c for c in raw_checks}
