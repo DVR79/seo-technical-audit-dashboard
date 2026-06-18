@@ -2592,7 +2592,12 @@ def page_mobile_audit():
         st.warning("Mobile audit data not available for this URL. Please re-run the audit.")
         return
 
-    # KPI strip
+    # KPI strip — reads cwv after potential live PSI patch
+    _psi_cache_key_kpi = f"psi_live_{r.get('url','')}"
+    _live_psi_kpi = st.session_state.get(_psi_cache_key_kpi)
+    if _live_psi_kpi and _live_psi_kpi.get("success"):
+        from modules.mobile_auditor import _parse_cwv as _pcwv_kpi
+        ma["cwv"] = _pcwv_kpi(r.get("technical_seo", {}), pagespeed=_live_psi_kpi)
     cwv_now      = ma.get("cwv", {})
     ps_now       = cwv_now.get("perf_score", 0) or 0
     psi_now      = "PageSpeed" in cwv_now.get("source", "")
@@ -2665,9 +2670,71 @@ def page_mobile_audit():
 
     # ── Tab: Core Web Vitals ──────────────────────────────────────────────
     with tab_cwv:
-        st.markdown('<div class="section-header">⚡ Core Web Vitals Estimates</div>', unsafe_allow_html=True)
-        st.caption("These are heuristic estimates from HTML/response analysis — not Lighthouse measurements. Use Google PageSpeed Insights for definitive scores.")
-        cwv = ma.get("cwv", {})
+        st.markdown('<div class="section-header">⚡ Core Web Vitals</div>', unsafe_allow_html=True)
+
+        # Live PSI fetch — allows getting real scores without re-running the full audit
+        current_url = r.get("url", "")
+        psi_cache_key = f"psi_live_{current_url}"
+
+        # If we already have real PSI data from the audit, use it
+        _stored_psi = r.get("pagespeed", {})
+        if _stored_psi and _stored_psi.get("success"):
+            if psi_cache_key not in st.session_state:
+                st.session_state[psi_cache_key] = _stored_psi
+
+        _live_psi = st.session_state.get(psi_cache_key)
+        _has_real = bool(_live_psi and _live_psi.get("success"))
+
+        if not _has_real:
+            st.markdown("""
+            <div style='background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);
+                 border-radius:8px;padding:10px 16px;margin-bottom:12px'>
+                <span style='font-size:.85rem;color:#F59E0B;font-weight:600'>⚠️ Showing heuristic estimates</span>
+                <span style='font-size:.78rem;color:var(--seo-muted,#94A3B8);margin-left:8px'>
+                — values are approximations based on server response time, not real Lighthouse measurements.</span>
+            </div>""", unsafe_allow_html=True)
+            psi_key_input = st.text_input(
+                "PSI API Key (optional)",
+                type="password",
+                placeholder="Leave blank for anonymous (free, ~100 req/day)",
+                key=f"psi_key_{current_url}",
+                label_visibility="collapsed",
+            )
+            if st.button("🚀 Fetch Real Scores from PageSpeed Insights", key=f"psi_btn_{current_url}",
+                         type="primary", use_container_width=False):
+                with st.spinner("Calling PageSpeed Insights API (~15s) …"):
+                    from modules.pagespeed import fetch_pagespeed as _fetch_psi_live
+                    _result = _fetch_psi_live(current_url, strategy="mobile",
+                                              api_key=psi_key_input.strip() or None)
+                if _result.get("success"):
+                    st.session_state[psi_cache_key] = _result
+                    # Patch mobile_audit cwv in place so KPI strip also updates on next render
+                    from modules.mobile_auditor import _parse_cwv as _pcwv
+                    r["mobile_audit"]["cwv"] = _pcwv(r.get("technical_seo", {}), pagespeed=_result)
+                    st.success("✅ Real Lighthouse data loaded!")
+                    st.rerun()
+                else:
+                    st.error(f"PSI API error: {_result.get('error','Unknown error')}")
+        else:
+            st.markdown("""
+            <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.35);
+                 border-radius:8px;padding:8px 16px;margin-bottom:12px;display:inline-block'>
+                <span style='font-size:.82rem;color:#10B981;font-weight:600'>
+                    ✅ Real Lighthouse data — PageSpeed Insights API</span>
+            </div>""", unsafe_allow_html=True)
+            if st.button("🔄 Re-fetch PageSpeed Insights", key=f"psi_refetch_{current_url}"):
+                if psi_cache_key in st.session_state:
+                    del st.session_state[psi_cache_key]
+                st.rerun()
+
+        # Use live PSI data if available, otherwise keep heuristic cwv
+        if _has_real:
+            from modules.mobile_auditor import _parse_cwv as _pcwv_live
+            cwv = _pcwv_live(r.get("technical_seo", {}), pagespeed=_live_psi)
+            # Patch into ma so the KPI strip and gauge show correct numbers
+            ma["cwv"] = cwv
+        else:
+            cwv = ma.get("cwv", {})
         # cwv values are nested dicts: {"value": "Good (<200ms)", "status": "pass"}
         _cwv_status_color = {"pass":"#10B981","warning":"#F59E0B","fail":"#EF4444","info":"#94A3B8"}
         _cwv_status_label = {"pass":"Good","warning":"Needs Improvement","fail":"Poor","info":"—"}
