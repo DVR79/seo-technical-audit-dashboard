@@ -372,13 +372,19 @@ def render_inline_result(r):
                            f"Unique: {il.get('unique_links',0)} | "
                            f"Dofollow: {il.get('dofollow_count',0)}")
                 bi = il.get("broken_count",0) or 0
-                st.error(f"🔴 {bi} broken") if bi else st.success("✅ No broken internal links")
+                if bi:
+                    st.error(f"🔴 {bi} broken")
+                else:
+                    st.success("✅ No broken internal links")
             with lc2:
                 st.caption(f"External — Total: {el_.get('total_links',0)} | "
                            f"Domains: {el_.get('unique_domains',0)} | "
                            f"Dofollow: {el_.get('dofollow_count',0)}")
                 be = el_.get("broken_count",0) or 0
-                st.error(f"🔴 {be} broken") if be else st.success("✅ No broken external links")
+                if be:
+                    st.error(f"🔴 {be} broken")
+                else:
+                    st.success("✅ No broken external links")
 
             # Course / Blog
             if atype == "course":
