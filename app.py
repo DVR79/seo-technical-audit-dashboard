@@ -35,6 +35,18 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
+# ── Load API keys from Streamlit secrets (permanent) into session_state ────
+# Secrets are set in the Streamlit Cloud dashboard → App settings → Secrets
+# or locally in .streamlit/secrets.toml
+for _sk, _ss in [("PSI_API_KEY", "psi_api_key_global")]:
+    if _ss not in st.session_state:
+        try:
+            _v = st.secrets.get(_sk, "")
+            if _v:
+                st.session_state[_ss] = _v
+        except Exception:
+            pass
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # Shared helpers
@@ -2695,27 +2707,36 @@ def page_mobile_audit():
             </div>""", unsafe_allow_html=True)
             # Persist the API key in session_state so button click doesn't clear it
             _psi_key_ss = "psi_api_key_global"
+            _saved_key  = st.session_state.get(_psi_key_ss, "")
             psi_key_col, psi_btn_col = st.columns([3, 1])
             with psi_key_col:
-                _typed_key = st.text_input(
-                    "Google API Key",
-                    value=st.session_state.get(_psi_key_ss, ""),
-                    type="password",
-                    placeholder="Paste your Google API Key here (required on Streamlit Cloud)",
-                    key="psi_key_input_field",
-                )
-                if _typed_key:
-                    st.session_state[_psi_key_ss] = _typed_key.strip()
+                if _saved_key:
+                    _masked = _saved_key[:6] + "•" * max(0, len(_saved_key) - 10) + _saved_key[-4:]
+                    st.markdown(f"""
+                    <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);
+                         border-radius:8px;padding:8px 14px;font-size:.8rem;color:#10B981'>
+                        ✅ API key from Settings: <span style='font-family:monospace'>{_masked}</span>
+                        &nbsp;·&nbsp;
+                        <a href='#' style='color:#10B981' onclick=''>change in ⚙️ Settings</a>
+                    </div>""", unsafe_allow_html=True)
+                else:
+                    _typed_key = st.text_input(
+                        "Google API Key",
+                        value="",
+                        type="password",
+                        placeholder="Paste API key here — or save it once in ⚙️ Settings",
+                        key="psi_key_input_field",
+                    )
+                    if _typed_key:
+                        st.session_state[_psi_key_ss] = _typed_key.strip()
             with psi_btn_col:
                 st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
                 _do_fetch = st.button("🚀 Fetch Real Scores", key=f"psi_btn_{current_url}",
                                       type="primary", use_container_width=True)
 
             _final_key = st.session_state.get(_psi_key_ss, "").strip() or None
-            if _final_key:
-                st.caption(f"✅ API key set ({len(_final_key)} chars) — ready to fetch")
-            else:
-                st.caption("⚠️ No API key — anonymous requests are blocked on Streamlit Cloud. Paste your key above.")
+            if not _final_key:
+                st.caption("⚠️ No API key — go to ⚙️ Settings to save your key permanently.")
 
             if _do_fetch:
                 if not _final_key:
@@ -3378,6 +3399,115 @@ def page_heading_analysis():
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Settings
+# ════════════════════════════════════════════════════════════════════════════
+
+def page_settings():
+    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>⚙️ Settings & API Keys</h2>",
+                unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class='info-box'>
+        API keys are saved in your browser session. For <b>permanent storage</b> that survives page reloads,
+        add them to <b>Streamlit Cloud Secrets</b> (instructions below).
+    </div>""", unsafe_allow_html=True)
+
+    # ── PageSpeed Insights API Key ─────────────────────────────────────────
+    st.markdown('<div class="section-header">🚀 Google PageSpeed Insights API Key</div>',
+                unsafe_allow_html=True)
+
+    col1, col2 = st.columns([3, 1])
+    _current_key = st.session_state.get("psi_api_key_global", "")
+    with col1:
+        _new_key = st.text_input(
+            "PageSpeed Insights API Key",
+            value=_current_key,
+            type="password",
+            placeholder="AIzaSy...",
+            help="Get a free key at console.cloud.google.com — 25,000 requests/day",
+            key="settings_psi_key",
+        )
+    with col2:
+        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+        if st.button("💾 Save Key", type="primary", use_container_width=True):
+            if _new_key.strip():
+                st.session_state["psi_api_key_global"] = _new_key.strip()
+                st.success("✅ API key saved for this session!")
+            else:
+                st.session_state.pop("psi_api_key_global", None)
+                st.info("API key cleared.")
+
+    if _current_key:
+        masked = _current_key[:6] + "•" * (len(_current_key) - 10) + _current_key[-4:]
+        st.markdown(f"""
+        <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);
+             border-radius:8px;padding:10px 14px;margin-top:6px;display:flex;align-items:center;gap:10px'>
+            <span style='font-size:1rem'>✅</span>
+            <span style='font-size:.82rem;color:#10B981;font-weight:600'>Key saved in session:</span>
+            <span style='font-size:.82rem;color:var(--seo-muted,#94A3B8);font-family:monospace'>{masked}</span>
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style='background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);
+             border-radius:8px;padding:10px 14px;margin-top:6px'>
+            <span style='font-size:.82rem;color:#F59E0B'>⚠️ No key saved — anonymous PSI requests
+            are rate-limited on Streamlit Cloud.</span>
+        </div>""", unsafe_allow_html=True)
+
+    # ── How to get a PSI key ───────────────────────────────────────────────
+    with st.expander("📖 How to get a free PageSpeed Insights API Key"):
+        st.markdown("""
+        1. Go to **[console.cloud.google.com](https://console.cloud.google.com)**
+        2. Create a project (or select an existing one)
+        3. **APIs & Services → Library** → search **"PageSpeed Insights API"** → **Enable**
+        4. **APIs & Services → Credentials** → **+ Create Credentials → API Key**
+        5. Copy the key (starts with `AIza`) and paste it above
+        6. **Free quota:** 25,000 requests/day with a key vs. ~25/day anonymous
+
+        **Optional — restrict the key for security:**
+        - In Credentials, click the key → API restrictions → select **PageSpeed Insights API**
+        """)
+
+    # ── Permanent storage instructions ────────────────────────────────────
+    st.markdown('<div class="section-header">🔐 Permanent Storage (Streamlit Cloud Secrets)</div>',
+                unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
+         border-radius:10px;padding:18px 20px'>
+        <div style='font-size:.85rem;color:var(--seo-text,#374151);line-height:1.8'>
+            Session keys are lost when you close the browser. To make them permanent:<br><br>
+            <b>1.</b> Go to your app on
+            <a href='https://share.streamlit.io' target='_blank' style='color:var(--seo-info-text,#1D4ED8)'>
+            share.streamlit.io</a><br>
+            <b>2.</b> Click <b>⋮ Menu → Settings → Secrets</b><br>
+            <b>3.</b> Add this line and click <b>Save</b>:<br>
+        </div>
+        <div style='background:rgba(0,0,0,.15);border-radius:6px;padding:10px 14px;margin:10px 0;
+             font-family:monospace;font-size:.85rem;color:#10B981'>
+            PSI_API_KEY = "AIzaSy..."
+        </div>
+        <div style='font-size:.82rem;color:var(--seo-muted,#64748B)'>
+            The app automatically loads this key on every startup — no need to re-enter it.
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    # ── Session info ───────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">ℹ️ Session Info</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
+         border-radius:10px;padding:14px 18px;font-size:.82rem;color:var(--seo-text,#374151)'>
+        <b>Audited URLs in session:</b> {len(st.session_state.get("audit_results", []))}<br>
+        <b>PSI Key in session:</b> {"✅ Set" if st.session_state.get("psi_api_key_global") else "❌ Not set"}<br>
+        <b>PSI Key from Streamlit secrets:</b>
+        {"✅ Loaded" if (lambda: __import__("contextlib").suppress(Exception) and
+            bool(st.secrets.get("PSI_API_KEY", "")))() else "—"}
+    </div>""", unsafe_allow_html=True)
+    if st.button("🗑️ Clear all audit data from session", type="secondary"):
+        st.session_state["audit_results"] = []
+        st.session_state["last_audit_date"] = None
+        st.success("Session audit data cleared.")
+
+
 # Export
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -3446,6 +3576,7 @@ with st.sidebar:
         "🖼️ Image SEO",
         "📝 Heading Analysis",
         "📤 Export Reports",
+        "⚙️ Settings",
     ], label_visibility="collapsed")
 
     if "page" in st.session_state and st.session_state.page == "URL Detail":
@@ -3487,3 +3618,4 @@ elif page == "📱 Mobile Audit":       page_mobile_audit()
 elif page == "🖼️ Image SEO":          page_image_seo()
 elif page == "📝 Heading Analysis":   page_heading_analysis()
 elif page == "📤 Export Reports":     page_export()
+elif page == "⚙️ Settings":           page_settings()
