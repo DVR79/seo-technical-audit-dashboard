@@ -476,13 +476,22 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
     soup = fetch["soup"]
 
     result["metadata"]     = analyze_metadata(soup, url)
-    result["headings"]     = analyze_headings(soup)
+    result["headings"]     = analyze_headings(soup)   # kept for scoring compatibility
     result["canonical"]    = analyze_canonical(soup, url)
     result["indexability"] = analyze_indexability(soup)
     result["url_structure"] = analyze_url_structure(url, result["response_time"])
     result["content"]      = analyze_content(soup)
-    result["images"]       = analyze_images(soup)
+    result["images"]       = analyze_images(soup)     # kept for scoring compatibility
     result["redirect_analysis"] = analyze_redirect_chain(result["redirect_chain"])
+
+    # ── Deep-analysis modules (new dedicated pages) ───────────────────────
+    from modules.heading_auditor import analyze_heading_structure
+    result["heading_detail"] = analyze_heading_structure(
+        soup, title=result["metadata"].get("title", "")
+    )
+
+    from modules.image_auditor import analyze_images_advanced
+    result["image_detail"] = analyze_images_advanced(soup, base_url=url)
 
     # Capture HTTP headers and page size from the fetch result
     http_headers = fetch.get("http_headers", {})
@@ -500,6 +509,14 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
 
     # Expose technical_seo sub-dict at top level for easy access
     result["technical_seo"] = result["advanced"].get("technical_seo", {})
+
+    from modules.mobile_auditor import analyze_mobile
+    result["mobile_audit"] = analyze_mobile(
+        soup,
+        base_url=url,
+        technical_seo=result["technical_seo"],
+        advanced_data=result["advanced"],
+    )
 
     if audit_type == "auto":
         result["audit_type"] = detect_page_type(url, soup)
