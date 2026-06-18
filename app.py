@@ -2708,13 +2708,29 @@ def page_mobile_audit():
                                               api_key=psi_key_input.strip() or None)
                 if _result.get("success"):
                     st.session_state[psi_cache_key] = _result
-                    # Patch mobile_audit cwv in place so KPI strip also updates on next render
                     from modules.mobile_auditor import _parse_cwv as _pcwv
                     r["mobile_audit"]["cwv"] = _pcwv(r.get("technical_seo", {}), pagespeed=_result)
                     st.success("✅ Real Lighthouse data loaded!")
                     st.rerun()
+                elif _result.get("error_code") == 429:
+                    st.markdown("""
+                    <div style='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);
+                         border-radius:8px;padding:14px 18px;margin-top:8px'>
+                        <div style='font-weight:700;color:#EF4444;font-size:.88rem;margin-bottom:8px'>
+                            🚫 Rate limit reached — Google blocked anonymous requests</div>
+                        <div style='font-size:.82rem;color:var(--seo-text,#CBD5E1);line-height:1.7'>
+                            Anonymous PSI API allows only a small number of requests per day
+                            from shared IPs (like Streamlit Cloud).<br><br>
+                            <b style='color:#F59E0B'>✅ Fix: Add a free Google API Key (takes 2 minutes)</b><br>
+                            1. Go to <b>console.cloud.google.com</b><br>
+                            2. Create a project → APIs &amp; Services → Enable
+                               <b>PageSpeed Insights API</b><br>
+                            3. Credentials → Create API Key → copy it<br>
+                            4. Paste it in the <b>PSI API Key</b> field above and click Fetch again
+                        </div>
+                    </div>""", unsafe_allow_html=True)
                 else:
-                    st.error(f"PSI API error: {_result.get('error','Unknown error')}")
+                    st.error(f"PSI error: {_result.get('error','Unknown error')}")
         else:
             st.markdown("""
             <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.35);

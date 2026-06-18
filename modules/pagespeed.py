@@ -60,12 +60,25 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
 
     try:
         resp = requests.get(PSI_ENDPOINT, params=params, timeout=PSI_TIMEOUT)
+        if resp.status_code == 429:
+            return {
+                "success": False,
+                "error_code": 429,
+                "error": (
+                    "Rate limit reached for anonymous PSI requests. "
+                    "Add a free Google API key to get 25,000 requests/day."
+                ),
+            }
+        if resp.status_code == 400:
+            return {"success": False, "error_code": 400,
+                    "error": "Invalid URL or request rejected by PageSpeed Insights."}
         resp.raise_for_status()
         data = resp.json()
     except requests.exceptions.Timeout:
-        return {"success": False, "error": "PageSpeed Insights request timed out (60s)."}
+        return {"success": False, "error_code": 0,
+                "error": "PageSpeed Insights request timed out (60s). Try again."}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error_code": 0, "error": str(e)}
 
     lhr    = data.get("lighthouseResult", {})
     cats   = lhr.get("categories", {})
