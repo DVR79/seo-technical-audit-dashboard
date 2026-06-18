@@ -65,6 +65,8 @@ def fetch_page(url):
             "content_type": resp.headers.get("Content-Type", ""),
             "soup": soup,
             "response_time": resp.elapsed.total_seconds(),
+            "http_headers": dict(resp.headers),
+            "page_size_bytes": len(resp.content),
         }
     except requests.exceptions.SSLError:
         try:
@@ -82,6 +84,8 @@ def fetch_page(url):
                 "soup": soup,
                 "response_time": resp.elapsed.total_seconds(),
                 "ssl_warning": True,
+                "http_headers": dict(resp.headers),
+                "page_size_bytes": len(resp.content),
             }
         except Exception as e:
             return {"success": False, "error": f"SSL Error: {e}", "status_code": 0}
@@ -439,6 +443,8 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
         "external_links": {},
         "course_audit": {},
         "blog_audit": {},
+        "http_headers": {},
+        "technical_seo": {},
         "seo_score": 0,
         "score_breakdown": {},
         "all_issues": [],
@@ -478,9 +484,22 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False):
     result["images"]       = analyze_images(soup)
     result["redirect_analysis"] = analyze_redirect_chain(result["redirect_chain"])
 
-    # Advanced checks (mobile, schema, social, hreflang, Twitter)
+    # Capture HTTP headers and page size from the fetch result
+    http_headers = fetch.get("http_headers", {})
+    page_size_bytes = fetch.get("page_size_bytes", 0)
+    result["http_headers"] = http_headers
+
+    # Advanced checks (mobile, schema, social, hreflang, Twitter, headers, technical)
     from modules.advanced_checks import analyze_advanced
-    result["advanced"] = analyze_advanced(soup, url)
+    result["advanced"] = analyze_advanced(
+        soup, url,
+        http_headers=http_headers,
+        page_size_bytes=page_size_bytes,
+        response_time=result["response_time"],
+    )
+
+    # Expose technical_seo sub-dict at top level for easy access
+    result["technical_seo"] = result["advanced"].get("technical_seo", {})
 
     if audit_type == "auto":
         result["audit_type"] = detect_page_type(url, soup)
@@ -532,6 +551,7 @@ def audit_urls_bulk(urls, audit_type="auto", check_links=True, validate_links=Fa
                 results.append({
                     "url": url, "fetch_error": str(e), "status_code": 0,
                     "audit_type": "general", "seo_score": 0, "advanced": {},
+                    "http_headers": {}, "technical_seo": {},
                     "all_issues": [_issue(str(e), "Error", "Critical",
                         "Check URL validity and network accessibility.",
                         impact_score=10, effort="High")],

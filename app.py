@@ -427,7 +427,7 @@ def render_inline_result(r):
     # ── Tabs ──────────────────────────────────────────────────────────────
     tabs = st.tabs([
         "📊 Summary", "🔗 Outgoing Links", "🌐 SERP & Social",
-        "🔬 Schema", "⚠️ Issues", "💡 Top Recommendations"
+        "🔬 Schema", "🔧 Technical", "⚠️ Issues", "💡 Top Recommendations"
     ])
 
     # Tab 0 — Summary
@@ -580,6 +580,54 @@ def render_inline_result(r):
                         <span style='font-weight:700;color:{_score_color(v)}'>{v:.0f}</span></div>""",
                         unsafe_allow_html=True)
 
+    # Tab 0 continued — Technical Signals grid (below score breakdown)
+    with tabs[0]:
+        tech_seo = adv.get("technical_seo", {})
+        hdr_data = adv.get("http_headers_data", {})
+        st.markdown("---")
+        st.markdown("**🔧 Technical Signals**")
+        def _chk(v): return "✅" if v else "❌"
+        signal_rows = [
+            [
+                ("HTTPS",        r.get("url_structure", {}).get("is_https", False)),
+                ("Viewport",     adv.get("has_viewport", False)),
+                ("Charset",      adv.get("has_charset", False)),
+                ("Lang",         bool(adv.get("lang_attr", ""))),
+                ("Canonical",    can_.get("is_self_referencing", False)),
+                ("Indexable",    idx_d.get("is_indexable", True)),
+            ],
+            [
+                ("HSTS",         hdr_data.get("has_hsts", False)),
+                ("Compression",  hdr_data.get("has_compression", False)),
+                ("Schema",       adv.get("has_schema", False)),
+                ("Twitter Cards",adv.get("twitter_complete", False)),
+                ("Favicon",      adv.get("has_favicon", False)),
+                ("AMP",          adv.get("has_amp", False)),
+            ],
+            [
+                ("OG Tags",      meta.get("has_og_tags", False)),
+                ("OG Image",     meta.get("has_og_image", False)),
+                ("Hreflang",     adv.get("has_hreflang", False)),
+                ("Pagination",   adv.get("has_pagination", False)),
+                ("RSS Feed",     tech_seo.get("has_rss_feed", False)),
+                ("Mixed Content",not tech_seo.get("has_mixed_content", False)),
+            ],
+        ]
+        row_labels = ["Core", "Security & Speed", "Social & Discovery"]
+        for row_label, row in zip(row_labels, signal_rows):
+            st.caption(row_label)
+            cols = st.columns(6)
+            for col, (label, val) in zip(cols, row):
+                icon = "✅" if val else "❌"
+                col.markdown(
+                    f"<div style='text-align:center;padding:6px 2px;"
+                    f"background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0'>"
+                    f"<div style='font-size:1.2rem'>{icon}</div>"
+                    f"<div style='font-size:.65rem;color:#475569;margin-top:2px'>{label}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
     # Tab 1 — Outgoing Links (Ahrefs-style)
     with tabs[1]:
         st.markdown('<div class="section-header">🔵 Internal Links</div>', unsafe_allow_html=True)
@@ -653,8 +701,182 @@ def render_inline_result(r):
             st.error(f"JSON-LD Parse Errors: {'; '.join(schema_errors)}")
         render_schema_display(schema_types, schema_raw)
 
-    # Tab 4 — Issues (thematic)
+    # Tab 4 — Technical (new)
     with tabs[4]:
+        _tech = adv.get("technical_seo", {})
+        _hdr  = adv.get("http_headers_data", {})
+        _raw_headers = r.get("http_headers", {})
+
+        # ── Performance & Page Size ───────────────────────────────────────
+        st.markdown('<div class="section-header">⚡ Performance & Page Size</div>', unsafe_allow_html=True)
+        tp1, tp2, tp3, tp4 = st.columns(4)
+        tp1.metric("Page Size", f"{_tech.get('page_size_kb', 0)} KB",
+                   help=_tech.get("page_size_label", ""))
+        tp2.metric("TTFB", f"{_tech.get('cwv_ttfb_ms', 0)} ms",
+                   help=_tech.get("cwv_ttfb_estimate", ""))
+        tp3.metric("DOM Elements", _tech.get("dom_elements", 0),
+                   help=_tech.get("dom_size_label", ""))
+        tp4.metric("Scripts", f"{_tech.get('external_script_count',0)} ext / {_tech.get('script_count',0)} total")
+
+        # ── Core Web Vitals Estimates ─────────────────────────────────────
+        st.markdown('<div class="section-header">📊 Core Web Vitals Estimates</div>', unsafe_allow_html=True)
+        st.caption("These are heuristic estimates based on response time and page size — not real field data.")
+
+        def _cwv_color(label):
+            if "Good" in label: return ("#D1FAE5", "#065F46")
+            if "Needs" in label: return ("#FEF3C7", "#92400E")
+            return ("#FEE2E2", "#991B1B")
+
+        cwv1, cwv2, cwv3 = st.columns(3)
+        ttfb_est = _tech.get("cwv_ttfb_estimate", "—")
+        lcp_est  = _tech.get("cwv_lcp_estimate", "—")
+        cls_est  = _tech.get("cwv_cls_risk", "—")
+
+        for col, metric_name, metric_val in [
+            (cwv1, "TTFB (Time to First Byte)", ttfb_est),
+            (cwv2, "LCP (Largest Contentful Paint)", lcp_est),
+            (cwv3, "CLS Risk (Layout Shift)", cls_est),
+        ]:
+            bg, fg = _cwv_color(metric_val)
+            col.markdown(
+                f"<div style='background:{bg};color:{fg};border-radius:10px;padding:14px 16px;text-align:center'>"
+                f"<div style='font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em'>{metric_name}</div>"
+                f"<div style='font-size:1.05rem;font-weight:800;margin-top:4px'>{metric_val}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ── HTTP Headers ──────────────────────────────────────────────────
+        st.markdown('<div class="section-header">📡 HTTP Response Headers</div>', unsafe_allow_html=True)
+        if _raw_headers:
+            # SEO-critical headers first
+            critical_hdr_keys = [
+                "content-type", "content-encoding", "cache-control",
+                "strict-transport-security", "content-security-policy",
+                "x-robots-tag", "x-frame-options", "x-content-type-options",
+                "referrer-policy", "permissions-policy", "server",
+                "etag", "last-modified", "cf-cache-status",
+            ]
+            shown_keys = set()
+            crit_rows = ""
+            for key in critical_hdr_keys:
+                for raw_key, val in _raw_headers.items():
+                    if raw_key.lower() == key:
+                        crit_rows += (
+                            f"<tr><td style='padding:5px 10px;font-weight:600;color:#1E40AF;"
+                            f"font-size:.78rem;white-space:nowrap'>{raw_key}</td>"
+                            f"<td style='padding:5px 10px;font-size:.76rem;color:#374151;"
+                            f"word-break:break-all'>{val}</td></tr>"
+                        )
+                        shown_keys.add(raw_key.lower())
+                        break
+
+            other_rows = ""
+            for raw_key, val in _raw_headers.items():
+                if raw_key.lower() not in shown_keys:
+                    other_rows += (
+                        f"<tr><td style='padding:4px 10px;font-size:.74rem;color:#64748B;"
+                        f"white-space:nowrap'>{raw_key}</td>"
+                        f"<td style='padding:4px 10px;font-size:.73rem;color:#475569;"
+                        f"word-break:break-all'>{val}</td></tr>"
+                    )
+
+            st.markdown(
+                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid #E2E8F0'>"
+                f"<table style='width:100%;border-collapse:collapse;background:#fff'>"
+                f"<thead style='background:#EFF6FF'><tr>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:#1E40AF'>Header</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:#1E40AF'>Value</th>"
+                f"</tr></thead><tbody>"
+                f"{crit_rows}"
+                f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:#94A3B8;"
+                f"background:#F8FAFC'>— Other headers —</td></tr>"
+                f"{other_rows}"
+                f"</tbody></table></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("No HTTP headers captured. Re-run the audit to collect headers.")
+
+        # ── Security Headers ──────────────────────────────────────────────
+        st.markdown('<div class="section-header">🔒 Security Headers</div>', unsafe_allow_html=True)
+        sec_items = [
+            ("HSTS (Strict-Transport-Security)", _hdr.get("has_hsts", False),
+             _hdr.get("hsts_value", "") or "Missing — add max-age=31536000; includeSubDomains"),
+            ("Content-Security-Policy", _hdr.get("has_csp", False),
+             "Present" if _hdr.get("has_csp") else "Missing — helps prevent XSS attacks"),
+            ("X-Frame-Options", _hdr.get("has_x_frame_options", False),
+             _hdr.get("x_frame_options", "") or "Missing — add SAMEORIGIN to prevent clickjacking"),
+            ("X-Content-Type-Options", _hdr.get("has_x_content_type_options", False),
+             "nosniff" if _hdr.get("has_x_content_type_options") else "Missing — add nosniff"),
+            ("Referrer-Policy", _hdr.get("has_referrer_policy", False),
+             _hdr.get("referrer_policy", "") or "Missing — recommended: strict-origin-when-cross-origin"),
+            ("Compression (gzip/br)", _hdr.get("has_compression", False),
+             _hdr.get("content_encoding", "identity") or "No compression detected"),
+        ]
+        for name, present, detail in sec_items:
+            icon = "✅" if present else "❌"
+            color = "#065F46" if present else "#991B1B"
+            bg = "#D1FAE5" if present else "#FEE2E2"
+            st.markdown(
+                f"<div style='display:flex;align-items:center;gap:10px;padding:7px 12px;"
+                f"background:{bg};border-radius:7px;margin-bottom:5px'>"
+                f"<span style='font-size:1rem'>{icon}</span>"
+                f"<span style='font-weight:600;font-size:.82rem;color:{color};min-width:220px'>{name}</span>"
+                f"<span style='font-size:.76rem;color:#374151'>{detail}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ── Resource Analysis ─────────────────────────────────────────────
+        st.markdown('<div class="section-header">📦 Resource Analysis</div>', unsafe_allow_html=True)
+        ra1, ra2, ra3, ra4 = st.columns(4)
+        ra1.metric("Scripts (total)", _tech.get("script_count", 0))
+        ra2.metric("Scripts (external)", _tech.get("external_script_count", 0))
+        ra3.metric("Stylesheets (total)", _tech.get("stylesheet_count", 0))
+        ra4.metric("Stylesheets (external)", _tech.get("external_stylesheet_count", 0))
+        rb1, rb2, rb3, rb4 = st.columns(4)
+        rb1.metric("Iframes", _tech.get("iframe_count", 0))
+        rb2.metric("DOM Elements", _tech.get("dom_elements", 0))
+        rb3.metric("Preconnect hints", len(_tech.get("preconnect_domains", [])))
+        rb4.metric("DNS-Prefetch", "Yes" if _tech.get("has_dns_prefetch") else "No")
+
+        if _tech.get("preconnect_domains"):
+            st.caption("Preconnect domains: " + ", ".join(_tech["preconnect_domains"][:8]))
+
+        mixed_cnt = _tech.get("mixed_content_count", 0)
+        if mixed_cnt:
+            st.error(f"🔴 Mixed Content: {mixed_cnt} HTTP resource(s) loaded on an HTTPS page. Fix immediately.")
+        else:
+            st.success("✅ No mixed content detected.")
+
+        # ── AMP & Pagination ──────────────────────────────────────────────
+        st.markdown('<div class="section-header">📄 AMP & Pagination</div>', unsafe_allow_html=True)
+        amp_col, pag_col = st.columns(2)
+        with amp_col:
+            st.markdown("**AMP**")
+            if _tech.get("has_amp"):
+                st.success(f"✅ AMP version detected")
+                if _tech.get("amp_url"):
+                    st.caption(f"AMP URL: {_tech['amp_url']}")
+            else:
+                st.info("No AMP version detected.")
+        with pag_col:
+            st.markdown("**Pagination**")
+            if _tech.get("has_pagination_prev") or _tech.get("has_pagination_next"):
+                st.success("✅ Pagination signals present")
+                if _tech.get("pagination_prev_url"):
+                    st.caption(f"rel=prev: {_tech['pagination_prev_url']}")
+                if _tech.get("pagination_next_url"):
+                    st.caption(f"rel=next: {_tech['pagination_next_url']}")
+            else:
+                st.info("No pagination (rel=prev/next) detected.")
+
+        if _tech.get("has_rss_feed"):
+            st.success(f"✅ RSS/Atom feed detected: {_tech.get('rss_url', '')}")
+
+    # Tab 5 — Issues (thematic)
+    with tabs[5]:
         from modules.scoring import get_thematic_issues
         themed = get_thematic_issues(issues)
         if not themed:
@@ -688,8 +910,8 @@ def render_inline_result(r):
                             <div style='font-size:.83rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
-    # Tab 5 — Top Recommendations by Impact
-    with tabs[5]:
+    # Tab 6 — Top Recommendations by Impact
+    with tabs[6]:
         from modules.scoring import get_top_issues_by_impact
         st.markdown('<div class="section-header">💡 Top Issues by Impact Score</div>', unsafe_allow_html=True)
         st.caption("Sorted by impact score (10 = highest ranking factor). Fix these first.")
@@ -1145,7 +1367,7 @@ def page_url_detail():
 
     tabs = st.tabs([
         "📊 Score Breakdown","🌐 SERP & Social","🔬 Schema & Technical",
-        "⚠️ Issues","🔗 Links","📄 Content & Images","🎓 Course/Blog","💡 Recommendations"
+        "📡 Technical","⚠️ Issues","🔗 Links","📄 Content & Images","🎓 Course/Blog","💡 Recommendations"
     ])
 
     # Tab 0 — Score Breakdown
@@ -1256,8 +1478,160 @@ def page_url_detail():
                 arrow = "→ " if i < len(chain)-1 else "✅ "
                 st.caption(f"{arrow} {u}")
 
-    # Tab 3 — Issues (thematic)
+    # Tab 3 — Technical (new)
     with tabs[3]:
+        _t = adv.get("technical_seo", {})
+        _h = adv.get("http_headers_data", {})
+        _raw_h = r.get("http_headers", {})
+
+        # Performance & Page Size
+        st.markdown('<div class="section-header">⚡ Performance & Page Size</div>', unsafe_allow_html=True)
+        pd1, pd2, pd3, pd4 = st.columns(4)
+        pd1.metric("Page Size", f"{_t.get('page_size_kb', 0)} KB", help=_t.get("page_size_label", ""))
+        pd2.metric("TTFB", f"{_t.get('cwv_ttfb_ms', 0)} ms", help=_t.get("cwv_ttfb_estimate", ""))
+        pd3.metric("DOM Elements", _t.get("dom_elements", 0), help=_t.get("dom_size_label", ""))
+        pd4.metric("Scripts", f"{_t.get('external_script_count',0)} ext / {_t.get('script_count',0)} total")
+
+        # Core Web Vitals Estimates
+        st.markdown('<div class="section-header">📊 Core Web Vitals Estimates</div>', unsafe_allow_html=True)
+        st.caption("Heuristic estimates based on response time and page size — not real field data.")
+
+        def _cwv_col(label):
+            if "Good" in (label or ""): return ("#D1FAE5", "#065F46")
+            if "Needs" in (label or "") or "Low" in (label or ""): return ("#FEF3C7", "#92400E")
+            return ("#FEE2E2", "#991B1B")
+
+        wv1, wv2, wv3 = st.columns(3)
+        for wcol, mname, mval in [
+            (wv1, "TTFB (Time to First Byte)", _t.get("cwv_ttfb_estimate", "—")),
+            (wv2, "LCP (Largest Contentful Paint)", _t.get("cwv_lcp_estimate", "—")),
+            (wv3, "CLS Risk (Layout Shift)", _t.get("cwv_cls_risk", "—")),
+        ]:
+            bg, fg = _cwv_col(mval)
+            wcol.markdown(
+                f"<div style='background:{bg};color:{fg};border-radius:10px;padding:14px 16px;text-align:center'>"
+                f"<div style='font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em'>{mname}</div>"
+                f"<div style='font-size:1.05rem;font-weight:800;margin-top:4px'>{mval}</div>"
+                f"</div>", unsafe_allow_html=True)
+
+        # HTTP Headers table
+        st.markdown('<div class="section-header">📡 HTTP Response Headers</div>', unsafe_allow_html=True)
+        if _raw_h:
+            crit_keys = [
+                "content-type","content-encoding","cache-control",
+                "strict-transport-security","content-security-policy",
+                "x-robots-tag","x-frame-options","x-content-type-options",
+                "referrer-policy","permissions-policy","server",
+                "etag","last-modified","cf-cache-status",
+            ]
+            shown = set()
+            crit_html = ""
+            for ck in crit_keys:
+                for rk, rv in _raw_h.items():
+                    if rk.lower() == ck:
+                        crit_html += (
+                            f"<tr><td style='padding:5px 10px;font-weight:600;color:#1E40AF;"
+                            f"font-size:.78rem;white-space:nowrap'>{rk}</td>"
+                            f"<td style='padding:5px 10px;font-size:.76rem;color:#374151;"
+                            f"word-break:break-all'>{rv}</td></tr>"
+                        )
+                        shown.add(rk.lower())
+                        break
+            other_html = "".join(
+                f"<tr><td style='padding:4px 10px;font-size:.74rem;color:#64748B;"
+                f"white-space:nowrap'>{rk}</td>"
+                f"<td style='padding:4px 10px;font-size:.73rem;color:#475569;"
+                f"word-break:break-all'>{rv}</td></tr>"
+                for rk, rv in _raw_h.items() if rk.lower() not in shown
+            )
+            st.markdown(
+                f"<div style='overflow-x:auto;border-radius:8px;border:1px solid #E2E8F0'>"
+                f"<table style='width:100%;border-collapse:collapse;background:#fff'>"
+                f"<thead style='background:#EFF6FF'><tr>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:#1E40AF'>Header</th>"
+                f"<th style='padding:7px 10px;text-align:left;font-size:.78rem;color:#1E40AF'>Value</th>"
+                f"</tr></thead><tbody>{crit_html}"
+                f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:#94A3B8;"
+                f"background:#F8FAFC'>— Other headers —</td></tr>"
+                f"{other_html}</tbody></table></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("No HTTP headers captured. Re-run the audit to collect headers.")
+
+        # Security Headers checklist
+        st.markdown('<div class="section-header">🔒 Security Headers</div>', unsafe_allow_html=True)
+        sec_chk = [
+            ("HSTS (Strict-Transport-Security)", _h.get("has_hsts", False),
+             _h.get("hsts_value", "") or "Missing — add max-age=31536000; includeSubDomains"),
+            ("Content-Security-Policy", _h.get("has_csp", False),
+             "Present" if _h.get("has_csp") else "Missing — helps prevent XSS attacks"),
+            ("X-Frame-Options", _h.get("has_x_frame_options", False),
+             _h.get("x_frame_options", "") or "Missing — add SAMEORIGIN"),
+            ("X-Content-Type-Options", _h.get("has_x_content_type_options", False),
+             "nosniff" if _h.get("has_x_content_type_options") else "Missing — add nosniff"),
+            ("Referrer-Policy", _h.get("has_referrer_policy", False),
+             _h.get("referrer_policy", "") or "Missing — recommended: strict-origin-when-cross-origin"),
+            ("Compression (gzip/br)", _h.get("has_compression", False),
+             _h.get("content_encoding", "identity") or "No compression detected"),
+        ]
+        for sname, spresent, sdetail in sec_chk:
+            sbg = "#D1FAE5" if spresent else "#FEE2E2"
+            sfg = "#065F46" if spresent else "#991B1B"
+            sicon = "✅" if spresent else "❌"
+            st.markdown(
+                f"<div style='display:flex;align-items:center;gap:10px;padding:7px 12px;"
+                f"background:{sbg};border-radius:7px;margin-bottom:5px'>"
+                f"<span style='font-size:1rem'>{sicon}</span>"
+                f"<span style='font-weight:600;font-size:.82rem;color:{sfg};min-width:220px'>{sname}</span>"
+                f"<span style='font-size:.76rem;color:#374151'>{sdetail}</span>"
+                f"</div>", unsafe_allow_html=True)
+
+        # Resource Analysis
+        st.markdown('<div class="section-header">📦 Resource Analysis</div>', unsafe_allow_html=True)
+        rr1, rr2, rr3, rr4 = st.columns(4)
+        rr1.metric("Scripts (total)", _t.get("script_count", 0))
+        rr2.metric("Scripts (external)", _t.get("external_script_count", 0))
+        rr3.metric("Stylesheets (total)", _t.get("stylesheet_count", 0))
+        rr4.metric("Stylesheets (external)", _t.get("external_stylesheet_count", 0))
+        rr5, rr6, rr7, rr8 = st.columns(4)
+        rr5.metric("Iframes", _t.get("iframe_count", 0))
+        rr6.metric("DOM Elements", _t.get("dom_elements", 0))
+        rr7.metric("Preconnect hints", len(_t.get("preconnect_domains", [])))
+        rr8.metric("DNS-Prefetch", "Yes" if _t.get("has_dns_prefetch") else "No")
+        if _t.get("preconnect_domains"):
+            st.caption("Preconnect domains: " + ", ".join(_t["preconnect_domains"][:8]))
+        if _t.get("has_mixed_content"):
+            st.error(f"🔴 Mixed Content: {_t.get('mixed_content_count',0)} HTTP resource(s) on HTTPS page.")
+        else:
+            st.success("✅ No mixed content detected.")
+
+        # AMP & Pagination
+        st.markdown('<div class="section-header">📄 AMP & Pagination</div>', unsafe_allow_html=True)
+        ac, pc = st.columns(2)
+        with ac:
+            st.markdown("**AMP**")
+            if _t.get("has_amp"):
+                st.success("✅ AMP version detected")
+                if _t.get("amp_url"):
+                    st.caption(f"AMP URL: {_t['amp_url']}")
+            else:
+                st.info("No AMP version detected.")
+        with pc:
+            st.markdown("**Pagination**")
+            if _t.get("has_pagination_prev") or _t.get("has_pagination_next"):
+                st.success("✅ Pagination signals present")
+                if _t.get("pagination_prev_url"):
+                    st.caption(f"rel=prev: {_t['pagination_prev_url']}")
+                if _t.get("pagination_next_url"):
+                    st.caption(f"rel=next: {_t['pagination_next_url']}")
+            else:
+                st.info("No pagination (rel=prev/next) detected.")
+        if _t.get("has_rss_feed"):
+            st.success(f"✅ RSS/Atom feed: {_t.get('rss_url', '')}")
+
+    # Tab 4 — Issues (thematic)
+    with tabs[4]:
         from modules.scoring import get_thematic_issues
         themed = get_thematic_issues(issues)
         if not themed:
@@ -1286,8 +1660,8 @@ def page_url_detail():
                             <div style='font-size:.83rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
-    # Tab 4 — Links (Ahrefs-style)
-    with tabs[4]:
+    # Tab 5 — Links (Ahrefs-style)
+    with tabs[5]:
         st.markdown('<div class="section-header">🔵 Internal Links</div>', unsafe_allow_html=True)
         i1,i2,i3,i4,i5,i6 = st.columns(6)
         i1.metric("Total",       il.get("total_links",0))
@@ -1324,8 +1698,8 @@ def page_url_detail():
         else:
             st.info("Enable 'Audit Links' in sidebar settings to see external link details.")
 
-    # Tab 5 — Content & Images
-    with tabs[5]:
+    # Tab 6 — Content & Images
+    with tabs[6]:
         ctt1, ctt2 = st.columns(2)
         with ctt1:
             st.markdown('<div class="section-header">Content Quality</div>', unsafe_allow_html=True)
@@ -1361,8 +1735,8 @@ def page_url_detail():
             st.markdown(f"**Response Time:** <span style='color:{perf_color};font-weight:700'>{rt:.2f}s</span>",
                         unsafe_allow_html=True)
 
-    # Tab 6 — Course/Blog
-    with tabs[6]:
+    # Tab 7 — Course/Blog
+    with tabs[7]:
         if atype == "course":
             ca = r.get("course_audit",{})
             st.markdown('<div class="section-header">🎓 Course Page Audit</div>', unsafe_allow_html=True)
@@ -1399,8 +1773,8 @@ def page_url_detail():
         else:
             st.info("General page — no course/blog specific checks available.")
 
-    # Tab 7 — Recommendations
-    with tabs[7]:
+    # Tab 8 — Recommendations
+    with tabs[8]:
         from modules.scoring import get_top_issues_by_impact
         top = get_top_issues_by_impact(issues, 20)
         st.markdown('<div class="section-header">💡 Prioritised Recommendations</div>',
