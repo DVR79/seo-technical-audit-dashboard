@@ -2635,32 +2635,43 @@ def page_mobile_audit():
         st.markdown('<div class="section-header">⚡ Core Web Vitals Estimates</div>', unsafe_allow_html=True)
         st.caption("These are heuristic estimates from HTML/response analysis — not Lighthouse measurements. Use Google PageSpeed Insights for definitive scores.")
         cwv = ma.get("cwv", {})
-        rating_color = {"Good":"#10B981","Needs Improvement":"#F59E0B","Poor":"#EF4444",
-                        "Low":"#10B981","Medium":"#F59E0B","High":"#EF4444","Unknown":"#94A3B8",
-                        "Requires Browser Measurement":"#94A3B8"}
+        # cwv values are nested dicts: {"value": "Good (<200ms)", "status": "pass"}
+        _cwv_status_color = {"pass":"#10B981","warning":"#F59E0B","fail":"#EF4444","info":"#94A3B8"}
+        _cwv_status_label = {"pass":"Good","warning":"Needs Improvement","fail":"Poor","info":"—"}
         cwv_metrics = [
-            ("TTFB", "Time to First Byte", cwv.get("ttfb","—"), cwv.get("ttfb_rating","Unknown"),
+            ("TTFB", "Time to First Byte",
+             cwv.get("ttfb", {}).get("value", "—"),
+             cwv.get("ttfb", {}).get("status", "info"),
              "< 200ms Good · 200–500ms Needs Improvement · > 500ms Poor"),
-            ("FCP", "First Contentful Paint", cwv.get("fcp","—"), cwv.get("fcp_rating","Unknown"),
+            ("FCP", "First Contentful Paint",
+             cwv.get("fcp", {}).get("value", "—"),
+             cwv.get("fcp", {}).get("status", "info"),
              "< 1.8s Good · 1.8–3s Needs Improvement · > 3s Poor"),
-            ("LCP", "Largest Contentful Paint", cwv.get("lcp","—"), cwv.get("lcp_rating","Unknown"),
+            ("LCP", "Largest Contentful Paint",
+             cwv.get("lcp", {}).get("value", "—"),
+             cwv.get("lcp", {}).get("status", "info"),
              "< 2.5s Good · 2.5–4s Needs Improvement · > 4s Poor"),
-            ("CLS", "Cumulative Layout Shift", cwv.get("cls","—"), cwv.get("cls_rating","Unknown"),
+            ("CLS", "Cumulative Layout Shift",
+             cwv.get("cls", {}).get("value", "—"),
+             cwv.get("cls", {}).get("status", "info"),
              "Low risk Good · Medium risk Warning · High risk Poor"),
-            ("INP", "Interaction to Next Paint", cwv.get("inp","Requires Browser Measurement"),
-             "info", "Cannot be measured from static HTML — use Chrome UX Report or PageSpeed Insights"),
+            ("INP", "Interaction to Next Paint",
+             cwv.get("inp", {}).get("value", "Requires Browser Measurement"),
+             "info",
+             "Cannot be measured from static HTML — use Chrome UX Report or PageSpeed Insights"),
         ]
         cw1, cw2, cw3, cw4, cw5 = st.columns(5)
-        for col, (metric, full_name, val, rating, desc) in zip([cw1,cw2,cw3,cw4,cw5], cwv_metrics):
-            clr = rating_color.get(rating, "#94A3B8")
+        for col, (metric, full_name, val, status, desc) in zip([cw1,cw2,cw3,cw4,cw5], cwv_metrics):
+            clr = _cwv_status_color.get(status, "#94A3B8")
+            rating_label = _cwv_status_label.get(status, status.title())
             with col:
                 st.markdown(f"""
                 <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
                      border-radius:10px;padding:14px;text-align:center'>
                     <div style='font-size:.7rem;font-weight:700;color:var(--seo-muted,#64748B);
                          text-transform:uppercase;letter-spacing:.06em'>{metric}</div>
-                    <div style='font-size:1.3rem;font-weight:800;color:{clr};margin:6px 0'>{val}</div>
-                    <div style='font-size:.68rem;font-weight:700;color:{clr}'>{rating}</div>
+                    <div style='font-size:1.1rem;font-weight:800;color:{clr};margin:6px 0'>{val}</div>
+                    <div style='font-size:.68rem;font-weight:700;color:{clr}'>{rating_label}</div>
                     <div style='font-size:.65rem;color:var(--seo-muted,#64748B);margin-top:4px'>{full_name}</div>
                 </div>""", unsafe_allow_html=True)
                 st.caption(desc)
@@ -3111,8 +3122,7 @@ def page_heading_analysis():
             for level, dup_list in dupes.items():
                 if dup_list:
                     for dup in dup_list:
-                        st.warning(f"**{level.upper()}** duplicated {dup.get('count',0)} times: "
-                                   f'"{dup.get("text","")[:80]}"')
+                        st.warning(f"**{level.upper()}** duplicated heading: \"{str(dup)[:80]}\"")
 
     # ── Tab: Full heading list ─────────────────────────────────────────────
     with tab_table:

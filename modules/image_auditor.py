@@ -452,5 +452,16 @@ def analyze_images_advanced(soup, base_url="", check_sizes=False, max_size_check
         "format_breakdown": summary["format_breakdown"],
         "format_opportunity": format_opportunity,
         "issues": issues,
+        # Flat access for page_image_seo() KPI strip and overview table
         "total": summary["total"],
+        "missing_alt": summary["missing_alt"],
+        "empty_alt": summary["empty_alt"],
+        "generic_alt": summary["generic_alt"],
+        "keyword_stuffed_alt": summary["keyword_stuffed_alt"],
+        "duplicate_alt": summary["duplicate_alt"],
+        "no_lazy": summary["no_lazy"],
+        "no_dimensions": summary["no_dimensions"],
+        "non_webp_jpg_png": summary["non_webp_jpg_png"],
+        "bad_naming": summary["bad_naming"],
+        "large_images": summary["large_images"],
     }
