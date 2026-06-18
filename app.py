@@ -2693,44 +2693,58 @@ def page_mobile_audit():
                 <span style='font-size:.78rem;color:var(--seo-muted,#94A3B8);margin-left:8px'>
                 — values are approximations based on server response time, not real Lighthouse measurements.</span>
             </div>""", unsafe_allow_html=True)
-            psi_key_input = st.text_input(
-                "PSI API Key (optional)",
-                type="password",
-                placeholder="Leave blank for anonymous (free, ~100 req/day)",
-                key=f"psi_key_{current_url}",
-                label_visibility="collapsed",
-            )
-            if st.button("🚀 Fetch Real Scores from PageSpeed Insights", key=f"psi_btn_{current_url}",
-                         type="primary", use_container_width=False):
-                with st.spinner("Calling PageSpeed Insights API (~15s) …"):
-                    from modules.pagespeed import fetch_pagespeed as _fetch_psi_live
-                    _result = _fetch_psi_live(current_url, strategy="mobile",
-                                              api_key=psi_key_input.strip() or None)
-                if _result.get("success"):
-                    st.session_state[psi_cache_key] = _result
-                    from modules.mobile_auditor import _parse_cwv as _pcwv
-                    r["mobile_audit"]["cwv"] = _pcwv(r.get("technical_seo", {}), pagespeed=_result)
-                    st.success("✅ Real Lighthouse data loaded!")
-                    st.rerun()
-                elif _result.get("error_code") == 429:
-                    st.markdown("""
-                    <div style='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);
-                         border-radius:8px;padding:14px 18px;margin-top:8px'>
-                        <div style='font-weight:700;color:#EF4444;font-size:.88rem;margin-bottom:8px'>
-                            🚫 Rate limit reached — Google blocked anonymous requests</div>
-                        <div style='font-size:.82rem;color:var(--seo-text,#CBD5E1);line-height:1.7'>
-                            Anonymous PSI API allows only a small number of requests per day
-                            from shared IPs (like Streamlit Cloud).<br><br>
-                            <b style='color:#F59E0B'>✅ Fix: Add a free Google API Key (takes 2 minutes)</b><br>
-                            1. Go to <b>console.cloud.google.com</b><br>
-                            2. Create a project → APIs &amp; Services → Enable
-                               <b>PageSpeed Insights API</b><br>
-                            3. Credentials → Create API Key → copy it<br>
-                            4. Paste it in the <b>PSI API Key</b> field above and click Fetch again
-                        </div>
-                    </div>""", unsafe_allow_html=True)
+            # Persist the API key in session_state so button click doesn't clear it
+            _psi_key_ss = "psi_api_key_global"
+            psi_key_col, psi_btn_col = st.columns([3, 1])
+            with psi_key_col:
+                _typed_key = st.text_input(
+                    "Google API Key",
+                    value=st.session_state.get(_psi_key_ss, ""),
+                    type="password",
+                    placeholder="Paste your Google API Key here (required on Streamlit Cloud)",
+                    key="psi_key_input_field",
+                )
+                if _typed_key:
+                    st.session_state[_psi_key_ss] = _typed_key.strip()
+            with psi_btn_col:
+                st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+                _do_fetch = st.button("🚀 Fetch Real Scores", key=f"psi_btn_{current_url}",
+                                      type="primary", use_container_width=True)
+
+            _final_key = st.session_state.get(_psi_key_ss, "").strip() or None
+            if _final_key:
+                st.caption(f"✅ API key set ({len(_final_key)} chars) — ready to fetch")
+            else:
+                st.caption("⚠️ No API key — anonymous requests are blocked on Streamlit Cloud. Paste your key above.")
+
+            if _do_fetch:
+                if not _final_key:
+                    st.error("Paste your Google API key before fetching. Anonymous requests are blocked on Streamlit Cloud.")
                 else:
-                    st.error(f"PSI error: {_result.get('error','Unknown error')}")
+                    with st.spinner("Calling PageSpeed Insights API (~15s) …"):
+                        from modules.pagespeed import fetch_pagespeed as _fetch_psi_live
+                        _result = _fetch_psi_live(current_url, strategy="mobile", api_key=_final_key)
+                    if _result.get("success"):
+                        st.session_state[psi_cache_key] = _result
+                        from modules.mobile_auditor import _parse_cwv as _pcwv
+                        r["mobile_audit"]["cwv"] = _pcwv(r.get("technical_seo", {}), pagespeed=_result)
+                        st.success("✅ Real Lighthouse data loaded!")
+                        st.rerun()
+                    elif _result.get("error_code") == 429:
+                        st.markdown("""
+                        <div style='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);
+                             border-radius:8px;padding:14px 18px;margin-top:8px'>
+                            <div style='font-weight:700;color:#EF4444;font-size:.88rem;margin-bottom:8px'>
+                                🚫 Still rate-limited — key may not be active yet</div>
+                            <div style='font-size:.82rem;color:var(--seo-text,#CBD5E1);line-height:1.8'>
+                                • Newly created API keys take <b>1–5 minutes</b> to activate — wait and try again<br>
+                                • Make sure <b>PageSpeed Insights API</b> is enabled in your Google Cloud project<br>
+                                • Verify the key has no IP/referrer restrictions that block Streamlit Cloud<br>
+                                • Your key should start with <b>AIza</b>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+                    else:
+                        st.error(f"PSI error: {_result.get('error','Unknown error')}")
         else:
             st.markdown("""
             <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.35);
