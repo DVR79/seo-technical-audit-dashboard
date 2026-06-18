@@ -2081,7 +2081,7 @@ def page_export():
 with st.sidebar:
     st.markdown("""
     <div style='text-align:center;padding:16px 0 8px'>
-        <div style='font-size:2rem'>🔍</div>
+        <div style='font-size:2rem' role='img' aria-label='Search icon'>🔍</div>
         <div style='font-size:1rem;font-weight:700;color:#F1F5F9'>SEO Audit Dashboard</div>
         <div style='font-size:.72rem;color:#94A3B8'>Enterprise SEO Platform</div>
     </div>""", unsafe_allow_html=True)
