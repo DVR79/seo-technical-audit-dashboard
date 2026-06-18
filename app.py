@@ -74,6 +74,134 @@ def metric_card(label, value, color="#3B82F6"):
         </div>""", unsafe_allow_html=True)
 
 
+# ── Ahrefs-style link table ────────────────────────────────────────────────
+
+def _health_badge(health, label):
+    colors = {
+        "ok":       ("#D1FAE5", "#065F46"),
+        "redirect": ("#FEF3C7", "#92400E"),
+        "blocked":  ("#EDE9FE", "#5B21B6"),
+        "broken":   ("#FEE2E2", "#991B1B"),
+        "unknown":  ("#F1F5F9", "#475569"),
+    }
+    bg, fg = colors.get(health, ("#F1F5F9", "#475569"))
+    return (f"<span style='background:{bg};color:{fg};padding:2px 7px;"
+            f"border-radius:4px;font-size:.72rem;font-weight:700;white-space:nowrap'>{label}</span>")
+
+
+def _rel_badge(is_dofollow, is_nofollow, is_sponsored, is_ugc):
+    if is_sponsored:
+        return "<span style='background:#FEF3C7;color:#92400E;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Sponsored</span>"
+    if is_ugc:
+        return "<span style='background:#EDE9FE;color:#5B21B6;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>UGC</span>"
+    if is_nofollow:
+        return "<span style='background:#FEE2E2;color:#991B1B;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Nofollow</span>"
+    return "<span style='background:#D1FAE5;color:#065F46;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Dofollow</span>"
+
+
+def render_link_table(links, show_source=False, source_label="Source", max_rows=100):
+    """Render an Ahrefs-style link table with status badges."""
+    if not links:
+        st.info("No links found.")
+        return
+
+    # Filter controls
+    fc1, fc2, fc3 = st.columns([2, 2, 2])
+    with fc1:
+        filter_rel = st.selectbox(
+            "Filter by Rel",
+            ["All", "Dofollow", "Nofollow", "Sponsored", "UGC"],
+            key=f"rel_f_{id(links)}"
+        )
+    with fc2:
+        filter_health = st.selectbox(
+            "Filter by Status",
+            ["All", "OK (2xx)", "Redirect (3xx)", "Broken (4xx/5xx)", "Blocked (999)", "Not Checked"],
+            key=f"hlt_f_{id(links)}"
+        )
+    with fc3:
+        search_q = st.text_input("Search URL / Anchor", key=f"srch_f_{id(links)}")
+
+    filtered = links
+    if filter_rel == "Dofollow":
+        filtered = [l for l in filtered if l.get("is_dofollow")]
+    elif filter_rel == "Nofollow":
+        filtered = [l for l in filtered if l.get("is_nofollow")]
+    elif filter_rel == "Sponsored":
+        filtered = [l for l in filtered if l.get("is_sponsored")]
+    elif filter_rel == "UGC":
+        filtered = [l for l in filtered if l.get("is_ugc")]
+
+    if filter_health == "OK (2xx)":
+        filtered = [l for l in filtered if l.get("health") == "ok"]
+    elif filter_health == "Redirect (3xx)":
+        filtered = [l for l in filtered if l.get("health") == "redirect"]
+    elif filter_health == "Broken (4xx/5xx)":
+        filtered = [l for l in filtered if l.get("health") == "broken"]
+    elif filter_health == "Blocked (999)":
+        filtered = [l for l in filtered if l.get("health") == "blocked"]
+    elif filter_health == "Not Checked":
+        filtered = [l for l in filtered if l.get("health") == "unknown"]
+
+    if search_q:
+        sq = search_q.lower()
+        filtered = [l for l in filtered
+                    if sq in l.get("url","").lower() or sq in l.get("anchor_text","").lower()]
+
+    st.caption(f"Showing **{min(len(filtered), max_rows)}** of {len(filtered)} links")
+
+    rows_html = ""
+    for lk in filtered[:max_rows]:
+        url    = lk.get("url","")
+        anchor = lk.get("anchor_text","[No Anchor]") or "[No Anchor]"
+        health = lk.get("health","unknown")
+        sl     = lk.get("status_label") or ("Not Checked" if lk.get("status_code") is None else str(lk.get("status_code","")))
+        hbadge = _health_badge(health, sl)
+        rbadge = _rel_badge(
+            lk.get("is_dofollow", True),
+            lk.get("is_nofollow", False),
+            lk.get("is_sponsored", False),
+            lk.get("is_ugc", False),
+        )
+        new_tab = "🔗" if lk.get("opens_new_tab") else ""
+        noop    = "" if lk.get("has_noopener") else ("⚠️" if lk.get("opens_new_tab") else "")
+        short_url = url[:70] + ("…" if len(url) > 70 else "")
+        short_anc = anchor[:55] + ("…" if len(anchor) > 55 else "")
+        source_col = (f"<td style='font-size:.72rem;color:#64748B;max-width:130px;word-break:break-all'>"
+                      f"{lk.get('source','')[:60]}</td>") if show_source else ""
+
+        rows_html += f"""
+        <tr style='border-bottom:1px solid #F1F5F9;'>
+            {source_col}
+            <td style='padding:7px 10px;max-width:260px;word-break:break-all'>
+                <a href='{url}' target='_blank' style='font-size:.78rem;color:#1D4ED8;text-decoration:none'
+                   title='{url}'>{short_url}</a>
+                <div style='font-size:.7rem;color:#94A3B8;margin-top:2px'>{short_anc}</div>
+            </td>
+            <td style='padding:7px 10px;text-align:center'>{rbadge}</td>
+            <td style='padding:7px 10px;text-align:center'>{hbadge}</td>
+            <td style='padding:7px 10px;text-align:center;font-size:.75rem;color:#64748B'>{new_tab} {noop}</td>
+        </tr>"""
+
+    source_th = f"<th style='padding:8px 10px;text-align:left;color:#374151;font-size:.78rem'>{source_label}</th>" if show_source else ""
+    table_html = f"""
+    <div style='overflow-x:auto;border-radius:10px;border:1px solid #E2E8F0;margin-top:8px'>
+    <table style='width:100%;border-collapse:collapse;background:#FFFFFF'>
+        <thead style='background:#F8FAFC'>
+            <tr>
+                {source_th}
+                <th style='padding:8px 10px;text-align:left;color:#374151;font-size:.78rem'>Target URL / Anchor Text</th>
+                <th style='padding:8px 10px;text-align:center;color:#374151;font-size:.78rem'>Link Type</th>
+                <th style='padding:8px 10px;text-align:center;color:#374151;font-size:.78rem'>Status</th>
+                <th style='padding:8px 10px;text-align:center;color:#374151;font-size:.78rem'>Tab / Security</th>
+            </tr>
+        </thead>
+        <tbody>{rows_html}</tbody>
+    </table>
+    </div>"""
+    st.markdown(table_html, unsafe_allow_html=True)
+
+
 def extract_urls_from_csv_xlsx(uploaded_file):
     try:
         if uploaded_file.name.endswith(".csv"):
@@ -298,8 +426,8 @@ def render_inline_result(r):
 
     # ── Tabs ──────────────────────────────────────────────────────────────
     tabs = st.tabs([
-        "📊 Summary", "🌐 SERP & Social", "🔬 Schema",
-        "⚠️ Issues", "💡 Top Recommendations"
+        "📊 Summary", "🔗 Outgoing Links", "🌐 SERP & Social",
+        "🔬 Schema", "⚠️ Issues", "💡 Top Recommendations"
     ])
 
     # Tab 0 — Summary
@@ -368,23 +496,45 @@ def render_inline_result(r):
             st.markdown('<div class="section-header">🔗 Links</div>', unsafe_allow_html=True)
             lc1, lc2 = st.columns(2)
             with lc1:
-                st.caption(f"Internal — Total: {il.get('total_links',0)} | "
-                           f"Unique: {il.get('unique_links',0)} | "
-                           f"Dofollow: {il.get('dofollow_count',0)}")
-                bi = il.get("broken_count",0) or 0
-                if bi:
-                    st.error(f"🔴 {bi} broken")
-                else:
-                    st.success("✅ No broken internal links")
+                bi      = il.get("broken_count",0) or 0
+                il_tot  = il.get("total_links",0)
+                il_df   = il.get("dofollow_count",0)
+                il_nf   = il.get("nofollow_count",0)
+                il_blk  = il.get("redirect_count",0) or 0
+                st.markdown(f"""
+                <div style='background:#F8FAFC;border-radius:8px;padding:10px 14px;border:1px solid #E2E8F0'>
+                    <div style='font-weight:700;font-size:.82rem;color:#0F172A;margin-bottom:6px'>🔵 Internal Links</div>
+                    <div style='display:flex;gap:10px;flex-wrap:wrap'>
+                        <span style='font-size:.75rem;color:#374151'>Total: <b>{il_tot}</b></span>
+                        <span style='font-size:.75rem;color:#10B981'>Dofollow: <b>{il_df}</b></span>
+                        <span style='font-size:.75rem;color:#EF4444'>Nofollow: <b>{il_nf}</b></span>
+                        <span style='font-size:.75rem;color:#F59E0B'>Redirects: <b>{il_blk}</b></span>
+                    </div>
+                    <div style='margin-top:6px'>
+                        {"<span style='background:#FEE2E2;color:#991B1B;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(bi) + " Broken</span>" if bi else "<span style='background:#D1FAE5;color:#065F46;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken Links</span>"}
+                    </div>
+                </div>""", unsafe_allow_html=True)
             with lc2:
-                st.caption(f"External — Total: {el_.get('total_links',0)} | "
-                           f"Domains: {el_.get('unique_domains',0)} | "
-                           f"Dofollow: {el_.get('dofollow_count',0)}")
-                be = el_.get("broken_count",0) or 0
-                if be:
-                    st.error(f"🔴 {be} broken")
-                else:
-                    st.success("✅ No broken external links")
+                be      = el_.get("broken_count",0) or 0
+                blk_cnt = el_.get("blocked_count",0) or 0
+                el_tot  = el_.get("total_links",0)
+                el_df   = el_.get("dofollow_count",0)
+                el_nf   = el_.get("nofollow_count",0)
+                el_dom  = el_.get("unique_domains",0)
+                st.markdown(f"""
+                <div style='background:#F8FAFC;border-radius:8px;padding:10px 14px;border:1px solid #E2E8F0'>
+                    <div style='font-weight:700;font-size:.82rem;color:#0F172A;margin-bottom:6px'>🟣 External Links</div>
+                    <div style='display:flex;gap:10px;flex-wrap:wrap'>
+                        <span style='font-size:.75rem;color:#374151'>Total: <b>{el_tot}</b></span>
+                        <span style='font-size:.75rem;color:#10B981'>Dofollow: <b>{el_df}</b></span>
+                        <span style='font-size:.75rem;color:#EF4444'>Nofollow: <b>{el_nf}</b></span>
+                        <span style='font-size:.75rem;color:#374151'>Domains: <b>{el_dom}</b></span>
+                    </div>
+                    <div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap'>
+                        {"<span style='background:#FEE2E2;color:#991B1B;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(be) + " Broken</span>" if be else "<span style='background:#D1FAE5;color:#065F46;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken</span>"}
+                        {"<span style='background:#EDE9FE;color:#5B21B6;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🚫 " + str(blk_cnt) + " Blocked</span>" if blk_cnt else ""}
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
             # Course / Blog
             if atype == "course":
@@ -430,8 +580,53 @@ def render_inline_result(r):
                         <span style='font-weight:700;color:{_score_color(v)}'>{v:.0f}</span></div>""",
                         unsafe_allow_html=True)
 
-    # Tab 1 — SERP & Social
+    # Tab 1 — Outgoing Links (Ahrefs-style)
     with tabs[1]:
+        st.markdown('<div class="section-header">🔵 Internal Links</div>', unsafe_allow_html=True)
+        il_links = il.get("links", [])
+        lm1, lm2, lm3, lm4, lm5 = st.columns(5)
+        lm1.metric("Total", il.get("total_links",0))
+        lm2.metric("Dofollow", il.get("dofollow_count",0))
+        lm3.metric("Nofollow", il.get("nofollow_count",0))
+        lm4.metric("Broken", il.get("broken_count",0))
+        lm5.metric("Redirects", il.get("redirect_count",0))
+        if il_links:
+            render_link_table(il_links, max_rows=100)
+        else:
+            st.info("No internal links found — enable 'Audit Links' to collect link data.")
+
+        st.markdown("---")
+        st.markdown('<div class="section-header">🟣 External Links</div>', unsafe_allow_html=True)
+        el_links = el_.get("links", [])
+        em1, em2, em3, em4, em5, em6 = st.columns(6)
+        em1.metric("Total", el_.get("total_links",0))
+        em2.metric("Domains", el_.get("unique_domains",0))
+        em3.metric("Dofollow", el_.get("dofollow_count",0))
+        em4.metric("Nofollow", el_.get("nofollow_count",0))
+        em5.metric("Broken", el_.get("broken_count",0))
+        em6.metric("Blocked", el_.get("blocked_count",0) or 0)
+
+        if not el_links:
+            st.info("No external links found — enable 'Audit Links' to collect link data.")
+        elif el_.get("broken_count",0) or el_.get("blocked_count",0):
+            bc = el_.get("broken_count",0) or 0
+            blk = el_.get("blocked_count",0) or 0
+            if bc:
+                st.error(f"⚠️ {bc} broken external link(s) detected — these return 4xx/5xx HTTP errors.")
+            if blk:
+                st.warning(f"🚫 {blk} link(s) blocked (e.g. LinkedIn/Twitter return 999) — not necessarily broken, site blocks automated checks.")
+            render_link_table(el_links, max_rows=100)
+        else:
+            render_link_table(el_links, max_rows=100)
+
+        if not il_links and not el_links:
+            st.markdown("""
+            > **Tip:** Turn on **"Audit Links"** in the sidebar settings before running the audit
+            > to see all internal and external links with their HTTP status codes.
+            """)
+
+    # Tab 2 — SERP & Social
+    with tabs[2]:
         serp = adv.get("serp_preview", {})
         social = adv.get("social_preview", {})
         s1, s2 = st.columns(2)
@@ -448,8 +643,8 @@ def render_inline_result(r):
             else:
                 st.info("Social preview data unavailable.")
 
-    # Tab 2 — Schema
-    with tabs[2]:
+    # Tab 3 — Schema
+    with tabs[3]:
         st.markdown('<div class="section-header">🔬 Structured Data</div>', unsafe_allow_html=True)
         schema_types = adv.get("schema_types", [])
         schema_raw   = adv.get("schema_raw", [])
@@ -458,8 +653,8 @@ def render_inline_result(r):
             st.error(f"JSON-LD Parse Errors: {'; '.join(schema_errors)}")
         render_schema_display(schema_types, schema_raw)
 
-    # Tab 3 — Issues (thematic)
-    with tabs[3]:
+    # Tab 4 — Issues (thematic)
+    with tabs[4]:
         from modules.scoring import get_thematic_issues
         themed = get_thematic_issues(issues)
         if not themed:
@@ -493,8 +688,8 @@ def render_inline_result(r):
                             <div style='font-size:.83rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
-    # Tab 4 — Top Recommendations by Impact
-    with tabs[4]:
+    # Tab 5 — Top Recommendations by Impact
+    with tabs[5]:
         from modules.scoring import get_top_issues_by_impact
         st.markdown('<div class="section-header">💡 Top Issues by Impact Score</div>', unsafe_allow_html=True)
         st.caption("Sorted by impact score (10 = highest ranking factor). Fix these first.")
@@ -737,10 +932,13 @@ def page_new_audit():
         audit_type = st.selectbox("Page Type",
             ["Auto-Detect","Course","Blog","General"],
             help="Auto-Detect analyses the URL to determine type.")
-        check_links    = st.toggle("Audit Links", value=True)
-        validate_links = st.toggle("Validate Link Status Codes", value=False,
-            help="HTTP-checks every link. Slower but finds broken links.")
+        check_links    = st.toggle("Audit Links", value=True,
+            help="Discover all internal and external links on the page.")
+        validate_links = st.toggle("Validate Link Status Codes", value=True,
+            help="HTTP-check every link and show status codes (like Ahrefs). Adds ~10-30s per page.")
         max_workers    = st.slider("Concurrent Workers", 2, 16, 6)
+        if validate_links:
+            st.caption("🔍 Status validation ON — links will show 200/301/403/404/999 etc.")
         st.markdown("---")
 
     atype_map = {"Auto-Detect":"auto","Course":"course","Blog":"blog","General":"general"}
@@ -1088,52 +1286,43 @@ def page_url_detail():
                             <div style='font-size:.83rem;color:#1D4ED8;margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
-    # Tab 4 — Links
+    # Tab 4 — Links (Ahrefs-style)
     with tabs[4]:
-        lc1, lc2 = st.columns(2)
-        with lc1:
-            st.markdown('<div class="section-header">🔵 Internal Links</div>', unsafe_allow_html=True)
-            i1,i2,i3,i4 = st.columns(4)
-            i1.metric("Total", il.get("total_links",0))
-            i2.metric("Unique", il.get("unique_links",0))
-            i3.metric("Dofollow", il.get("dofollow_count",0))
-            i4.metric("Broken", il.get("broken_count",0))
-            st.caption(f"Nofollow: {il.get('nofollow_count',0)} | New Tab: {il.get('new_tab_count',0)} | "
-                       f"Redirects: {il.get('redirect_count',0)} | Weak Anchors: {il.get('weak_anchor_count',0)}")
-        with lc2:
-            st.markdown('<div class="section-header">🟣 External Links</div>', unsafe_allow_html=True)
-            e1,e2,e3,e4 = st.columns(4)
-            e1.metric("Total", el_.get("total_links",0))
-            e2.metric("Domains", el_.get("unique_domains",0))
-            e3.metric("Dofollow", el_.get("dofollow_count",0))
-            e4.metric("Broken", el_.get("broken_count",0))
-            st.caption(f"Nofollow: {el_.get('nofollow_count',0)} | Sponsored: {el_.get('sponsored_count',0)} | "
-                       f"UGC: {el_.get('ugc_count',0)} | Missing noopener: {el_.get('missing_noopener_count',0)}")
-
+        st.markdown('<div class="section-header">🔵 Internal Links</div>', unsafe_allow_html=True)
+        i1,i2,i3,i4,i5,i6 = st.columns(6)
+        i1.metric("Total",       il.get("total_links",0))
+        i2.metric("Unique",      il.get("unique_links",0))
+        i3.metric("Dofollow",    il.get("dofollow_count",0))
+        i4.metric("Nofollow",    il.get("nofollow_count",0))
+        i5.metric("Broken",      il.get("broken_count",0))
+        i6.metric("Weak Anchors",il.get("weak_anchor_count",0))
         if il.get("links"):
-            st.markdown('<div class="section-header">Internal Link Details</div>', unsafe_allow_html=True)
-            il_df = pd.DataFrame([{
-                "URL": lk.get("url","")[:80], "Anchor": lk.get("anchor_text","")[:40],
-                "Dofollow": "✅" if lk.get("is_dofollow") else "❌",
-                "New Tab": "✅" if lk.get("opens_new_tab") else "—",
-                "Noopener": "✅" if lk.get("has_noopener") else "❌",
-                "Status": lk.get("status_code") or "—",
-                "Broken": "🔴" if lk.get("is_broken") else ("—" if lk.get("is_broken") is None else "✅"),
-            } for lk in il["links"][:30]])
-            st.dataframe(il_df, use_container_width=True, height=280)
+            render_link_table(il["links"], max_rows=150)
+        else:
+            st.info("Enable 'Audit Links' in sidebar settings to see internal link details.")
+
+        st.markdown("---")
+        st.markdown('<div class="section-header">🟣 External / Outgoing Links</div>', unsafe_allow_html=True)
+        e1,e2,e3,e4,e5,e6,e7 = st.columns(7)
+        e1.metric("Total",    el_.get("total_links",0))
+        e2.metric("Domains",  el_.get("unique_domains",0))
+        e3.metric("Dofollow", el_.get("dofollow_count",0))
+        e4.metric("Nofollow", el_.get("nofollow_count",0))
+        e5.metric("Broken",   el_.get("broken_count",0))
+        e6.metric("Blocked",  el_.get("blocked_count",0) or 0)
+        e7.metric("Sponsored",el_.get("sponsored_count",0))
+
+        be_d = el_.get("broken_count",0) or 0
+        blk_d= el_.get("blocked_count",0) or 0
+        if be_d:
+            st.error(f"⚠️ {be_d} external link(s) return 4xx/5xx — these are broken and should be fixed.")
+        if blk_d:
+            st.warning(f"🚫 {blk_d} link(s) blocked (LinkedIn, Twitter etc. return 999 for bots) — not broken, just restricted access.")
 
         if el_.get("links"):
-            st.markdown('<div class="section-header">External Link Details</div>', unsafe_allow_html=True)
-            el_df = pd.DataFrame([{
-                "URL": lk.get("url","")[:80], "Anchor": lk.get("anchor_text","")[:40],
-                "Dofollow": "✅" if lk.get("is_dofollow") else "❌",
-                "Nofollow": "✅" if lk.get("is_nofollow") else "—",
-                "Sponsored": "✅" if lk.get("is_sponsored") else "—",
-                "New Tab": "✅" if lk.get("opens_new_tab") else "❌",
-                "Noopener": "✅" if lk.get("has_noopener") else "❌",
-                "Status": lk.get("status_code") or "—",
-            } for lk in el_["links"][:30]])
-            st.dataframe(el_df, use_container_width=True, height=280)
+            render_link_table(el_["links"], max_rows=150)
+        else:
+            st.info("Enable 'Audit Links' in sidebar settings to see external link details.")
 
     # Tab 5 — Content & Images
     with tabs[5]:
@@ -1254,69 +1443,75 @@ def page_link_analysis():
         st.info("No audit results yet.")
         return
 
-    all_int = [(r.get("url",""), lk) for r in results for lk in r.get("internal_links",{}).get("links",[])]
-    all_ext = [(r.get("url",""), lk) for r in results for lk in r.get("external_links",{}).get("links",[])]
+    from modules.link_auditor import get_base_domain
+
+    # Build flat lists with source URL attached
+    all_int_links = []
+    for r_item in results:
+        for lk in r_item.get("internal_links",{}).get("links",[]):
+            lk2 = dict(lk); lk2["source"] = r_item.get("url","")
+            all_int_links.append(lk2)
+
+    all_ext_links = []
+    for r_item in results:
+        for lk in r_item.get("external_links",{}).get("links",[]):
+            lk2 = dict(lk); lk2["source"] = r_item.get("url","")
+            all_ext_links.append(lk2)
 
     tab_i, tab_e = st.tabs(["🔵 Internal Links", "🟣 External Links"])
 
     with tab_i:
-        c1,c2,c3,c4 = st.columns(4)
-        c1.metric("Total", sum(r.get("internal_links",{}).get("total_links",0) for r in results))
-        c2.metric("Broken", sum(r.get("internal_links",{}).get("broken_count",0) or 0 for r in results))
-        c3.metric("Redirecting", sum(r.get("internal_links",{}).get("redirect_count",0) or 0 for r in results))
-        c4.metric("Nofollow", sum(r.get("internal_links",{}).get("nofollow_count",0) or 0 for r in results))
-        if all_int:
-            rows = [{"Source": src[-50:], "URL": lk.get("url","")[:70],
-                     "Anchor": lk.get("anchor_text","")[:35],
-                     "Dofollow":"✅" if lk.get("is_dofollow") else "❌",
-                     "New Tab":"✅" if lk.get("opens_new_tab") else "—",
-                     "Noopener":"✅" if lk.get("has_noopener") else "❌",
-                     "Status": lk.get("status_code") or "—",
-                     "Broken":"🔴" if lk.get("is_broken") else ("—" if lk.get("is_broken") is None else "✅"),
-                    } for src, lk in all_int[:500]]
-            df_i = pd.DataFrame(rows)
-            search = st.text_input("Search internal links", key="si")
-            if search:
-                df_i = df_i[df_i.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
-            st.dataframe(df_i, use_container_width=True, height=450)
+        c1,c2,c3,c4,c5 = st.columns(5)
+        c1.metric("Total",      sum(r.get("internal_links",{}).get("total_links",0) for r in results))
+        c2.metric("Broken",     sum(r.get("internal_links",{}).get("broken_count",0) or 0 for r in results))
+        c3.metric("Redirecting",sum(r.get("internal_links",{}).get("redirect_count",0) or 0 for r in results))
+        c4.metric("Nofollow",   sum(r.get("internal_links",{}).get("nofollow_count",0) or 0 for r in results))
+        c5.metric("Unique URLs",len({l["url"] for l in all_int_links}))
+
+        tot_brk_i = sum(r.get("internal_links",{}).get("broken_count",0) or 0 for r in results)
+        if tot_brk_i:
+            st.error(f"⚠️ {tot_brk_i} broken internal link(s) detected across all audited pages.")
+
+        if all_int_links:
+            render_link_table(all_int_links, show_source=True, source_label="Source Page", max_rows=200)
+        else:
+            st.info("No internal link data. Enable 'Audit Links' and re-run the audit.")
 
     with tab_e:
-        c1,c2,c3,c4 = st.columns(4)
-        c1.metric("Total", sum(r.get("external_links",{}).get("total_links",0) for r in results))
-        c2.metric("Broken", sum(r.get("external_links",{}).get("broken_count",0) or 0 for r in results))
-        c3.metric("Dofollow", sum(r.get("external_links",{}).get("dofollow_count",0) or 0 for r in results))
-
         domain_counts = {}
-        for r_item in results:
-            for lk in r_item.get("external_links",{}).get("links",[]):
-                from modules.link_auditor import get_base_domain
-                d = get_base_domain(lk.get("url",""))
-                domain_counts[d] = domain_counts.get(d,0) + 1
-        c4.metric("Unique Domains", len(domain_counts))
+        for lk in all_ext_links:
+            d = get_base_domain(lk.get("url",""))
+            domain_counts[d] = domain_counts.get(d,0) + 1
+
+        c1,c2,c3,c4,c5,c6 = st.columns(6)
+        c1.metric("Total",    sum(r.get("external_links",{}).get("total_links",0) for r in results))
+        c2.metric("Broken",   sum(r.get("external_links",{}).get("broken_count",0) or 0 for r in results))
+        c3.metric("Blocked",  sum(r.get("external_links",{}).get("blocked_count",0) or 0 for r in results))
+        c4.metric("Dofollow", sum(r.get("external_links",{}).get("dofollow_count",0) or 0 for r in results))
+        c5.metric("Nofollow", sum(r.get("external_links",{}).get("nofollow_count",0) or 0 for r in results))
+        c6.metric("Domains",  len(domain_counts))
+
+        tot_brk_e = sum(r.get("external_links",{}).get("broken_count",0) or 0 for r in results)
+        tot_blk_e = sum(r.get("external_links",{}).get("blocked_count",0) or 0 for r in results)
+        if tot_brk_e:
+            st.error(f"⚠️ {tot_brk_e} broken external link(s) (4xx/5xx) — update or remove these.")
+        if tot_blk_e:
+            st.warning(f"🚫 {tot_blk_e} link(s) blocked by site (e.g. LinkedIn 999, McKinsey 403) — not broken, just bot-restricted.")
 
         if domain_counts:
             top_d = dict(sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:15])
             fig = px.bar(x=list(top_d.values()), y=list(top_d.keys()), orientation="h",
-                         title="Top External Domains", labels={"x":"Links","y":"Domain"},
+                         title="Top 15 External Domains by Link Count",
+                         labels={"x":"Link Count","y":"Domain"},
                          color=list(top_d.values()), color_continuous_scale="Blues")
             fig.update_layout(showlegend=False, height=380, coloraxis_showscale=False,
                               margin=dict(t=40,b=10,l=10,r=10))
             st.plotly_chart(fig, use_container_width=True)
 
-        if all_ext:
-            rows = [{"Source": src[-50:], "URL": lk.get("url","")[:70],
-                     "Anchor": lk.get("anchor_text","")[:35],
-                     "Dofollow":"✅" if lk.get("is_dofollow") else "❌",
-                     "Nofollow":"✅" if lk.get("is_nofollow") else "—",
-                     "Sponsored":"✅" if lk.get("is_sponsored") else "—",
-                     "New Tab":"✅" if lk.get("opens_new_tab") else "❌",
-                     "Noopener":"✅" if lk.get("has_noopener") else "❌",
-                    } for src, lk in all_ext[:500]]
-            df_e = pd.DataFrame(rows)
-            search_e = st.text_input("Search external links", key="se")
-            if search_e:
-                df_e = df_e[df_e.apply(lambda row: search_e.lower() in str(row).lower(), axis=1)]
-            st.dataframe(df_e, use_container_width=True, height=450)
+        if all_ext_links:
+            render_link_table(all_ext_links, show_source=True, source_label="Source Page", max_rows=200)
+        else:
+            st.info("No external link data. Enable 'Audit Links' and re-run the audit.")
 
 
 # ════════════════════════════════════════════════════════════════════════════
