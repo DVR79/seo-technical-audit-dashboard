@@ -1980,6 +1980,67 @@ def page_url_detail():
                 st.markdown("**Technical**")
                 st.markdown(f"{'✅' if ba.get('has_article_schema') else '❌'} Article Schema")
                 st.markdown(f"{'✅' if ba.get('has_og_tags') else '❌'} Open Graph Tags")
+
+            # ── Content Body Preview ─────────────────────────────────────
+            st.markdown("---")
+            intro_paras = cont.get("intro_paragraphs", [])
+            conc_paras  = cont.get("conclusion_paragraphs", [])
+            total_paras = cont.get("total_paragraphs", 0)
+
+            if intro_paras or conc_paras:
+                cp1, cp2 = st.columns(2)
+
+                with cp1:
+                    st.markdown(
+                        "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>"
+                        "<span style='background:#DBEAFE;color:#1E40AF;padding:2px 10px;"
+                        "border-radius:20px;font-size:.75rem;font-weight:700'>INTRO</span>"
+                        "<span style='font-size:.8rem;color:#64748B'>Beginning of blog content</span>"
+                        "</div>",
+                        unsafe_allow_html=True
+                    )
+                    if intro_paras:
+                        for i, para in enumerate(intro_paras):
+                            border = "3px solid #3B82F6" if i == 0 else "2px solid #93C5FD"
+                            opacity = "1" if i == 0 else "0.75"
+                            st.markdown(
+                                f"<div style='border-left:{border};background:#EFF6FF;"
+                                f"padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:8px;"
+                                f"opacity:{opacity}'>"
+                                f"<span style='font-size:.78rem;color:#1E3A5F;line-height:1.6'>{para[:400]}{'…' if len(para)>400 else ''}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.info("No intro paragraphs detected.")
+
+                with cp2:
+                    st.markdown(
+                        "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>"
+                        "<span style='background:#D1FAE5;color:#065F46;padding:2px 10px;"
+                        "border-radius:20px;font-size:.75rem;font-weight:700'>CONCLUSION</span>"
+                        "<span style='font-size:.8rem;color:#64748B'>Ending of blog content</span>"
+                        "</div>",
+                        unsafe_allow_html=True
+                    )
+                    if conc_paras:
+                        for i, para in enumerate(conc_paras):
+                            border = "3px solid #10B981" if i == len(conc_paras)-1 else "2px solid #6EE7B7"
+                            opacity = "1" if i == len(conc_paras)-1 else "0.75"
+                            st.markdown(
+                                f"<div style='border-left:{border};background:#ECFDF5;"
+                                f"padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:8px;"
+                                f"opacity:{opacity}'>"
+                                f"<span style='font-size:.78rem;color:#064E3B;line-height:1.6'>{para[:400]}{'…' if len(para)>400 else ''}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.info("No conclusion paragraphs detected.")
+
+                st.caption(f"Showing first 3 and last 3 paragraphs from {total_paras} total content paragraphs detected.")
+            else:
+                st.info("Content preview not available — re-run the audit to extract paragraph data.")
         else:
             st.info("General page — no course/blog specific checks available.")
 

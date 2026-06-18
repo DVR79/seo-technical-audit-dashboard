@@ -338,9 +338,21 @@ def analyze_content(soup):
             "Reduce bloated HTML markup and increase meaningful text content.",
             impact_score=3, effort="Medium"))
 
+    # Extract beginning and ending paragraphs for content preview
+    paras = [
+        p.get_text(separator=" ", strip=True)
+        for p in soup_copy.find_all("p")
+        if len(p.get_text(strip=True)) > 60   # skip very short/nav paragraphs
+    ]
+    intro_paras     = paras[:3]   # first 3 meaningful paragraphs
+    conclusion_paras = paras[-3:] if len(paras) > 3 else []
+
     return {
         "word_count": word_count, "reading_time": reading_time,
         "content_ratio": content_ratio, "is_thin": word_count < THIN_THRESHOLD,
+        "intro_paragraphs": intro_paras,
+        "conclusion_paragraphs": conclusion_paras,
+        "total_paragraphs": len(paras),
         "issues": issues,
     }
 
