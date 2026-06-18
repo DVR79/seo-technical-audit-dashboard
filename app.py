@@ -2351,44 +2351,31 @@ def page_link_analysis():
         if i_miss_no:
             st.warning(f"🔒 {i_miss_no} internal link(s) open in new tab without rel='noopener'.")
 
-        # Tab behavior breakdown
+        # Tab behavior breakdown — clickable cards
         st.markdown('<div class="section-header">🖱️ Tab Behavior & Security</div>', unsafe_allow_html=True)
+        sec_clr = "#10B981" if i_miss_no == 0 else "#EF4444"
+        _int_tab_cards = [
+            ("Same Tab",         i_total - i_new_tab, "#3B82F6", "int_tab", "same_tab",      [l for l in all_int_links if not l.get("opens_new_tab")]),
+            ("New Tab",          i_new_tab,            "#8B5CF6", "int_tab", "new_tab",       [l for l in all_int_links if l.get("opens_new_tab")]),
+            ("Missing noopener", i_miss_no,            sec_clr,   "int_tab", "miss_noopener", [l for l in all_int_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+            ("Secure New Tab",   i_new_tab - i_miss_no,"#10B981", "int_tab", "secure_tab",   [l for l in all_int_links if l.get("opens_new_tab") and l.get("has_noopener")]),
+        ]
         tb1, tb2, tb3, tb4 = st.columns(4)
-        with tb1:
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:14px;text-align:center'>
-                <div style='font-size:1.5rem;font-weight:800;color:#3B82F6'>{i_total - i_new_tab}</div>
-                <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>Same Tab</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B)'>target not _blank</div>
-            </div>""", unsafe_allow_html=True)
-        with tb2:
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:14px;text-align:center'>
-                <div style='font-size:1.5rem;font-weight:800;color:#8B5CF6'>{i_new_tab}</div>
-                <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>New Tab</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B)'>target="_blank"</div>
-            </div>""", unsafe_allow_html=True)
-        with tb3:
-            sec_ok_i = i_new_tab - i_miss_no
-            sec_clr  = "#10B981" if i_miss_no == 0 else "#EF4444"
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:14px;text-align:center'>
-                <div style='font-size:1.5rem;font-weight:800;color:{sec_clr}'>{i_miss_no}</div>
-                <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>Missing noopener</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B)'>security risk</div>
-            </div>""", unsafe_allow_html=True)
-        with tb4:
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:14px;text-align:center'>
-                <div style='font-size:1.5rem;font-weight:800;color:#10B981'>{i_new_tab - i_miss_no}</div>
-                <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>Secure New Tab</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B)'>has noopener</div>
-            </div>""", unsafe_allow_html=True)
+        for col, (label, val, clr, fkind, fkey, _) in zip([tb1,tb2,tb3,tb4], _int_tab_cards):
+            _kpi_card_btn(col, label, val, clr, fkind, fkey)
 
+        # Show filtered table if a card was clicked
+        ov_f = st.session_state.get("la_ov_filter")
+        if ov_f and ov_f[0] == "int_tab":
+            _, fkey = ov_f
+            matched = next((links for lbl, val, clr, fk0, fk1, links in _int_tab_cards if fk1 == fkey), [])
+            lbl_name = next((lbl for lbl, val, clr, fk0, fk1, links in _int_tab_cards if fk1 == fkey), fkey)
+            st.markdown("---")
+            st.markdown(f"**🔵 Internal — {lbl_name}** &nbsp; <span style='background:#F1F5F9;color:#475569;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600'>{len(matched)} links</span>", unsafe_allow_html=True)
+            if matched:
+                render_link_table(matched, show_source=True, source_label="Source Page", max_rows=300, key_prefix=f"la_{fkey}")
+            else:
+                st.info("No links match this filter.")
         st.markdown("<br>", unsafe_allow_html=True)
 
         # Per-page internal link summary
@@ -2425,27 +2412,33 @@ def page_link_analysis():
         if e_no_sec:
             st.warning(f"🔒 {e_no_sec} external new-tab link(s) missing rel='noopener noreferrer' — security risk.")
 
-        # Security attributes breakdown
+        # Security attributes breakdown — clickable cards
         st.markdown('<div class="section-header">🔒 Security Attributes Analysis</div>', unsafe_allow_html=True)
-        sa1, sa2, sa3, sa4, sa5 = st.columns(5)
         e_same_tab = e_total - e_new_tab
         e_full_sec = e_new_tab - e_no_sec
-        _sec_items = [
-            (sa1, "Same Tab",       e_same_tab,  "#3B82F6", "no target=_blank"),
-            (sa2, "New Tab",        e_new_tab,   "#8B5CF6", "target=_blank"),
-            (sa3, "Has noopener",   e_full_sec,  "#10B981", "safe new tabs"),
-            (sa4, "Missing noopener",e_miss_no,  "#F97316", "⚠️ fix these"),
-            (sa5, "Missing both",   e_no_sec,    "#EF4444", "noopener+noreferrer"),
+        _ext_sec_cards = [
+            ("Same Tab",         e_same_tab, "#3B82F6", "ext_tab", "e_same_tab",    [l for l in all_ext_links if not l.get("opens_new_tab")]),
+            ("New Tab",          e_new_tab,  "#8B5CF6", "ext_tab", "e_new_tab",     [l for l in all_ext_links if l.get("opens_new_tab")]),
+            ("Has noopener",     e_full_sec, "#10B981", "ext_tab", "e_has_noopener",[l for l in all_ext_links if l.get("opens_new_tab") and l.get("has_noopener")]),
+            ("Missing noopener", e_miss_no,  "#F97316", "ext_tab", "e_miss_no",     [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
+            ("Missing both",     e_no_sec,   "#EF4444", "ext_tab", "e_no_sec",      [l for l in all_ext_links if l.get("opens_new_tab") and not l.get("has_noopener")]),
         ]
-        for col, label, val, clr, sub in _sec_items:
-            with col:
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-radius:10px;padding:12px;text-align:center'>
-                    <div style='font-size:1.4rem;font-weight:800;color:{clr}'>{val}</div>
-                    <div style='font-size:.73rem;color:var(--seo-muted,#64748B);margin-top:2px'>{label}</div>
-                    <div style='font-size:.65rem;color:var(--seo-muted,#64748B)'>{sub}</div>
-                </div>""", unsafe_allow_html=True)
+        sa1, sa2, sa3, sa4, sa5 = st.columns(5)
+        for col, (label, val, clr, fkind, fkey, _) in zip([sa1,sa2,sa3,sa4,sa5], _ext_sec_cards):
+            _kpi_card_btn(col, label, val, clr, fkind, fkey)
+
+        # Show filtered table when a card is clicked
+        ov_f = st.session_state.get("la_ov_filter")
+        if ov_f and ov_f[0] == "ext_tab":
+            _, fkey = ov_f
+            matched = next((links for lbl, val, clr, fk0, fk1, links in _ext_sec_cards if fk1 == fkey), [])
+            lbl_name = next((lbl for lbl, val, clr, fk0, fk1, links in _ext_sec_cards if fk1 == fkey), fkey)
+            st.markdown("---")
+            st.markdown(f"**🟣 External — {lbl_name}** &nbsp; <span style='background:#F1F5F9;color:#475569;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600'>{len(matched)} links</span>", unsafe_allow_html=True)
+            if matched:
+                render_link_table(matched, show_source=True, source_label="Source Page", max_rows=300, key_prefix=f"la_e_{fkey}")
+            else:
+                st.info("No links match this filter.")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
