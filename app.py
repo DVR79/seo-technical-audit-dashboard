@@ -378,16 +378,12 @@ def page_new_audit():
                     st.session_state.audit_results.insert(0, result)
                 st.session_state.last_audit_date = datetime.now().strftime("%Y-%m-%d %H:%M")
                 st.session_state.selected_url_idx = 0
+                st.session_state["single_result"] = result
 
-                score = result.get("seo_score", 0)
-                issues = result.get("all_issues", [])
-                critical_n = sum(1 for i in issues if i.get("severity") == "Critical")
-
-                st.success(
-                    f"✅ Audit complete — SEO Score: **{score}/100** | "
-                    f"Issues: {len(issues)} (Critical: {critical_n})"
-                )
-                st.info("Navigate to **Audit Results** or **URL Detail** in the sidebar.")
+        # ── Inline results (persists across reruns) ───────────────────────
+        result = st.session_state.get("single_result")
+        if result:
+            _render_inline_result(result)
 
     # ── Tab 2: Bulk Upload ────────────────────────────────────────────────
     with tab2:
