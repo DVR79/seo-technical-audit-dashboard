@@ -3122,32 +3122,32 @@ def page_image_seo():
     if not results:
         _no_data_info(); return
 
-    # ── Overview across all URLs ──────────────────────────────────────────
-    st.markdown('<div class="section-header">📊 Image SEO Overview — All URLs</div>',
-                unsafe_allow_html=True)
-    ov_rows = []
-    for r in results:
-        im = r.get("image_detail", {})
-        ov_rows.append({
-            "URL":           r.get("url","")[-70:],
-            "Total Images":  im.get("total",0),
-            "Missing Alt":   im.get("missing_alt",0),
-            "Empty Alt":     im.get("empty_alt",0),
-            "No Lazy Load":  im.get("no_lazy",0),
-            "No Dimensions": im.get("no_dimensions",0),
-            "Non-WebP":      im.get("non_webp_jpg_png",0),
-            "Bad Naming":    im.get("bad_naming",0),
-        })
-    st.dataframe(pd.DataFrame(ov_rows), use_container_width=True, hide_index=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ── Overview table across all URLs ────────────────────────────────────
+    with st.expander("📊 All URLs — Image SEO Overview", expanded=len(results) > 1):
+        ov_rows = []
+        for r in results:
+            im = r.get("image_detail", {})
+            total = im.get("total", 0)
+            ok_alt = total - im.get("missing_alt",0) - im.get("empty_alt",0) - im.get("generic_alt",0)
+            ov_rows.append({
+                "Page URL":      r.get("url","")[-80:],
+                "Total":         total,
+                "✅ OK Alt":     max(ok_alt, 0),
+                "❌ Missing Alt": im.get("missing_alt",0),
+                "⚠️ Empty Alt":  im.get("empty_alt",0),
+                "🔵 Generic Alt": im.get("generic_alt",0),
+                "No Lazy":       im.get("no_lazy",0),
+                "No Dimensions": im.get("no_dimensions",0),
+                "Non-WebP":      im.get("non_webp_jpg_png",0),
+            })
+        st.dataframe(pd.DataFrame(ov_rows), use_container_width=True, hide_index=True)
 
     # ── URL selector ──────────────────────────────────────────────────────
     urls = [r.get("url","") for r in results]
-    sel  = st.selectbox("Select URL for detailed analysis", range(len(urls)),
+    sel  = st.selectbox("Select URL for detailed image analysis", range(len(urls)),
                         format_func=lambda i: urls[i][-90:], key="img_url_sel")
-    r    = results[sel]
-    im   = r.get("image_detail", {})
+    r   = results[sel]
+    im  = r.get("image_detail", {})
 
     if not im:
         st.warning("Image audit data not available. Please re-run the audit.")
@@ -3155,25 +3155,39 @@ def page_image_seo():
 
     images = im.get("images", [])
 
-    # KPI strip
-    kc = st.columns(7)
-    _img_kpis = [
-        (kc[0], "Total Images",    im.get("total",0),          "#3B82F6"),
-        (kc[1], "Missing Alt",     im.get("missing_alt",0),    "#EF4444"),
-        (kc[2], "Empty Alt",       im.get("empty_alt",0),      "#F97316"),
-        (kc[3], "Generic Alt",     im.get("generic_alt",0),    "#F59E0B"),
-        (kc[4], "No Lazy Load",    im.get("no_lazy",0),        "#8B5CF6"),
-        (kc[5], "No Dimensions",   im.get("no_dimensions",0),  "#F97316"),
-        (kc[6], "Non-WebP (PNG/JPG)", im.get("non_webp_jpg_png",0), "#06B6D4"),
-    ]
-    for col, lbl, val, clr in _img_kpis:
+    # ── KPI cards — clickable to filter table ─────────────────────────────
+    if "img_filter" not in st.session_state:
+        st.session_state["img_filter"] = None
+
+    def _img_kpi_btn(col, label, val, clr, fkey):
+        active = st.session_state.get("img_filter") == fkey
+        border = f"2px solid {clr}" if active else "1px solid var(--seo-border,rgba(148,163,184,.22))"
+        shadow = f"0 0 0 2px {clr}44" if active else "none"
         with col:
             st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:12px;text-align:center'>
+            <div style='background:var(--seo-card-bg,#fff);border:{border};box-shadow:{shadow};
+                 border-radius:10px;padding:10px 6px;text-align:center'>
                 <div style='font-size:1.3rem;font-weight:800;color:{clr}'>{val}</div>
-                <div style='font-size:.65rem;color:var(--seo-muted,#64748B);margin-top:2px'>{lbl}</div>
+                <div style='font-size:.63rem;color:var(--seo-muted,#64748B);margin-top:2px;line-height:1.3'>{label}</div>
             </div>""", unsafe_allow_html=True)
+            if st.button(f"↓ {label}", key=f"imgbtn_{fkey}", use_container_width=True,
+                         help=f"Filter images: {label}"):
+                st.session_state["img_filter"] = None if st.session_state.get("img_filter") == fkey else fkey
+                st.rerun()
+
+    kc = st.columns(8)
+    _img_kpis = [
+        (kc[0], "Total",        im.get("total",0),               "#3B82F6", "all"),
+        (kc[1], "Missing Alt",  im.get("missing_alt",0),          "#EF4444", "missing"),
+        (kc[2], "Empty Alt",    im.get("empty_alt",0),            "#F97316", "empty"),
+        (kc[3], "Generic Alt",  im.get("generic_alt",0),          "#F59E0B", "generic"),
+        (kc[4], "No Lazy Load", im.get("no_lazy",0),              "#8B5CF6", "no_lazy"),
+        (kc[5], "No Dimensions",im.get("no_dimensions",0),        "#F97316", "no_dims"),
+        (kc[6], "Non-WebP",     im.get("non_webp_jpg_png",0),     "#06B6D4", "non_webp"),
+        (kc[7], "Bad Naming",   im.get("bad_naming",0),           "#94A3B8", "bad_name"),
+    ]
+    for col, lbl, val, clr, fkey in _img_kpis:
+        _img_kpi_btn(col, lbl, val, clr, fkey)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -3186,18 +3200,34 @@ def page_image_seo():
             st.info("No images found on this page.")
         else:
             # Filter controls
-            fc1, fc2, fc3 = st.columns(3)
+            fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 3])
             with fc1:
-                f_alt = st.selectbox("Filter by Alt Status",
+                f_alt = st.selectbox("Alt Status",
                     ["All","missing","empty","generic","keyword_stuffed","ok"], key="img_f_alt")
             with fc2:
-                f_lazy = st.selectbox("Filter by Lazy Load",
+                f_lazy = st.selectbox("Lazy Load",
                     ["All","Has lazy","Missing lazy"], key="img_f_lazy")
             with fc3:
-                f_fmt = st.selectbox("Filter by Format",
+                f_fmt = st.selectbox("Format",
                     ["All","JPEG","PNG","WebP","SVG","GIF","AVIF","Unknown"], key="img_f_fmt")
+            with fc4:
+                f_search = st.text_input("Search filename or alt text", placeholder="Type to search…", key="img_f_search")
 
-            filtered = images
+            # Apply active KPI card filter first
+            active_card = st.session_state.get("img_filter")
+            card_filter_map = {
+                "all":      lambda i: True,
+                "missing":  lambda i: i.get("alt_status") == "missing",
+                "empty":    lambda i: i.get("alt_status") == "empty",
+                "generic":  lambda i: i.get("alt_status") == "generic",
+                "no_lazy":  lambda i: not i.get("has_lazy"),
+                "no_dims":  lambda i: not i.get("has_dimensions"),
+                "non_webp": lambda i: i.get("extension","") in ("jpg","jpeg","png"),
+                "bad_name": lambda i: i.get("naming_quality") == "bad",
+            }
+            filtered = [i for i in images if card_filter_map.get(active_card, lambda x: True)(i)] if active_card else images
+
+            # Dropdown filters
             if f_alt != "All":
                 filtered = [i for i in filtered if i.get("alt_status") == f_alt]
             if f_lazy == "Has lazy":
@@ -3206,60 +3236,99 @@ def page_image_seo():
                 filtered = [i for i in filtered if not i.get("has_lazy")]
             if f_fmt != "All":
                 filtered = [i for i in filtered if i.get("format_label") == f_fmt]
+            if f_search:
+                sq = f_search.lower()
+                filtered = [i for i in filtered if sq in (i.get("name","") or "").lower()
+                            or sq in (i.get("alt_text","") or "").lower()
+                            or sq in (i.get("url","") or "").lower()]
 
-            st.caption(f"Showing **{len(filtered)}** of {len(images)} images")
+            # Legend + count
+            st.markdown(
+                f"Showing **{len(filtered)}** of {len(images)} images &nbsp;|&nbsp; "
+                f"Alt: "
+                f"<span style='background:#D1FAE5;color:#065F46;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>OK</span> &nbsp;"
+                f"<span style='background:#FEE2E2;color:#991B1B;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Missing</span> &nbsp;"
+                f"<span style='background:#FED7AA;color:#9A3412;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Empty</span> &nbsp;"
+                f"<span style='background:#FEF3C7;color:#92400E;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Generic</span> &nbsp;"
+                f"<span style='background:#EDE9FE;color:#5B21B6;border-radius:3px;padding:1px 6px;font-size:.7rem;font-weight:700'>Stuffed</span>",
+                unsafe_allow_html=True
+            )
 
             alt_status_badge = {
-                "missing":        "<span style='background:#FEE2E2;color:#991B1B;padding:1px 7px;border-radius:4px;font-size:.7rem'>Missing</span>",
-                "empty":          "<span style='background:#FED7AA;color:#9A3412;padding:1px 7px;border-radius:4px;font-size:.7rem'>Empty</span>",
-                "generic":        "<span style='background:#FEF3C7;color:#92400E;padding:1px 7px;border-radius:4px;font-size:.7rem'>Generic</span>",
-                "keyword_stuffed":"<span style='background:#EDE9FE;color:#5B21B6;padding:1px 7px;border-radius:4px;font-size:.7rem'>Stuffed</span>",
-                "ok":             "<span style='background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:4px;font-size:.7rem'>OK</span>",
+                "missing":        "<span style='background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700'>Missing</span>",
+                "empty":          "<span style='background:#FED7AA;color:#9A3412;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700'>Empty</span>",
+                "generic":        "<span style='background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700'>Generic</span>",
+                "keyword_stuffed":"<span style='background:#EDE9FE;color:#5B21B6;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700'>Stuffed</span>",
+                "ok":             "<span style='background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700'>OK</span>",
             }
-            fmt_color = {"JPEG":"#3B82F6","PNG":"#8B5CF6","WebP":"#10B981","SVG":"#F59E0B",
-                          "GIF":"#EF4444","AVIF":"#06B6D4","Unknown":"#94A3B8"}
+            fmt_badge = {
+                "JPEG":    ("<span style='background:#DBEAFE;color:#1E40AF;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>JPEG</span>"),
+                "PNG":     ("<span style='background:#EDE9FE;color:#5B21B6;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>PNG</span>"),
+                "WebP":    ("<span style='background:#D1FAE5;color:#065F46;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>WebP</span>"),
+                "SVG":     ("<span style='background:#FEF3C7;color:#92400E;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>SVG</span>"),
+                "GIF":     ("<span style='background:#FEE2E2;color:#991B1B;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>GIF</span>"),
+                "AVIF":    ("<span style='background:#CFFAFE;color:#0E7490;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>AVIF</span>"),
+                "Unknown": ("<span style='background:#F1F5F9;color:#475569;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>?</span>"),
+            }
 
             rows_html = ""
             for img in filtered[:200]:
-                url_short = img.get("url","")[-60:] or "—"
-                name      = img.get("name","—")[:30]
-                fmt       = img.get("format_label","Unknown")
-                fmt_c     = fmt_color.get(fmt,"#94A3B8")
-                alt_st    = img.get("alt_status","missing")
-                alt_badge = alt_status_badge.get(alt_st,"")
-                alt_txt   = (img.get("alt_text") or "")[:50]
-                lazy_ic   = "✅" if img.get("has_lazy") else "❌"
-                dims      = f'{img.get("width","?")}×{img.get("height","?")}' if img.get("has_dimensions") else "—"
-                srcset_ic = "✅" if img.get("has_srcset") else "—"
-                size_lbl  = img.get("file_size_label","Unknown")
-                name_q    = "✅" if img.get("naming_quality") == "good" else "⚠️"
+                raw_url  = img.get("url","") or ""
+                name     = img.get("name","") or "—"
+                # Show clean filename; if name is a CDN hash, fall back to last path segment
+                disp_name = name[:45] + ("…" if len(name) > 45 else "")
+                # Readable URL: show last 2 path segments so user sees context
+                from urllib.parse import urlparse as _uparse
+                _parts = [p for p in _uparse(raw_url).path.split("/") if p]
+                url_label = ("/".join(_parts[-2:]) if len(_parts) >= 2 else _parts[-1] if _parts else raw_url)[:60]
+
+                fmt      = img.get("format_label","Unknown")
+                fmt_b    = fmt_badge.get(fmt, fmt_badge["Unknown"])
+                alt_st   = img.get("alt_status","missing")
+                alt_b    = alt_status_badge.get(alt_st,"")
+                alt_txt  = (img.get("alt_text") or "")
+                alt_disp = alt_txt[:60] + ("…" if len(alt_txt) > 60 else "") if alt_txt else "<span style='color:#94A3B8;font-style:italic'>—</span>"
+                lazy_b   = "<span style='background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>✓</span>" if img.get("has_lazy") else "<span style='background:#FEE2E2;color:#991B1B;padding:1px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>✗</span>"
+                dims_val = f'{img.get("width")}×{img.get("height")}' if img.get("has_dimensions") else "<span style='color:#94A3B8'>—</span>"
+                srcset_b = "<span style='color:#10B981;font-size:.8rem'>✓</span>" if img.get("has_srcset") else "<span style='color:#94A3B8;font-size:.8rem'>—</span>"
+                name_q   = "" if img.get("naming_quality") == "good" else " <span style='color:#F59E0B;font-size:.7rem' title='Poor filename'>⚠</span>"
+                size_lbl = img.get("file_size_label","—")
+
+                # Thumbnail: only render for non-SVG/non-CDN-hashed URLs
+                if raw_url and fmt not in ("SVG",) and raw_url.startswith("http"):
+                    thumb = f"<img src='{raw_url}' style='width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid rgba(148,163,184,.2)' onerror=\"this.style.display='none'\" loading='lazy'>"
+                else:
+                    thumb = f"<span style='display:inline-block;width:36px;height:36px;background:#F1F5F9;border-radius:4px;text-align:center;line-height:36px;font-size:.65rem;color:#94A3B8'>{fmt[:3]}</span>"
 
                 rows_html += f"""
                 <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.12))'>
-                    <td style='padding:7px 8px;font-size:.73rem;color:var(--seo-info-text,#1D4ED8);
-                         max-width:200px;word-break:break-all'>{url_short}</td>
-                    <td style='padding:7px 8px;font-size:.73rem;color:var(--seo-muted,#64748B)'>{name} {name_q}</td>
-                    <td style='padding:7px 8px;text-align:center'>
-                        <span style='color:{fmt_c};font-weight:700;font-size:.75rem'>{fmt}</span></td>
-                    <td style='padding:7px 8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>{size_lbl}</td>
-                    <td style='padding:7px 8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>{dims}</td>
-                    <td style='padding:7px 8px'>{alt_badge}
-                        <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{alt_txt}</div></td>
-                    <td style='padding:7px 8px;text-align:center;font-size:.8rem'>{lazy_ic}</td>
-                    <td style='padding:7px 8px;text-align:center;font-size:.8rem'>{srcset_ic}</td>
+                    <td style='padding:6px 8px;text-align:center;width:44px'>{thumb}</td>
+                    <td style='padding:6px 8px;max-width:220px'>
+                        <a href='{raw_url}' target='_blank' style='font-size:.73rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none;word-break:break-all' title='{raw_url}'>{url_label}</a>
+                        <div style='font-size:.67rem;color:var(--seo-muted,#64748B);margin-top:1px'>{disp_name}{name_q}</div>
+                    </td>
+                    <td style='padding:6px 8px;text-align:center'>{fmt_b}</td>
+                    <td style='padding:6px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>{size_lbl}</td>
+                    <td style='padding:6px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>{dims_val}</td>
+                    <td style='padding:6px 8px;max-width:200px'>
+                        {alt_b}
+                        <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{alt_disp}</div>
+                    </td>
+                    <td style='padding:6px 8px;text-align:center'>{lazy_b}</td>
+                    <td style='padding:6px 8px;text-align:center'>{srcset_b}</td>
                 </tr>"""
 
             st.markdown(f"""
-            <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+            <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--seo-border,rgba(148,163,184,.22));margin-top:8px'>
             <table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>
                 <thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'>
                 <tr>
-                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>Image URL</th>
-                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>Name</th>
+                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);width:44px'></th>
+                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>Image URL / Filename</th>
                     <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>Format</th>
-                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>File Size</th>
-                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>Dimensions</th>
-                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>Alt Text</th>
+                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>File Size</th>
+                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>Dimensions</th>
+                    <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B)'>Alt Text (Keyword)</th>
                     <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>Lazy</th>
                     <th style='padding:8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>srcset</th>
                 </tr>
@@ -3281,52 +3350,79 @@ def page_image_seo():
                     marker_colors=[fmt_clrs.get(k,"#94A3B8") for k in fmts],
                 ))
                 fig_fmt.update_traces(textinfo="label+value+percent", textfont_size=11)
-                fig_fmt.update_layout(showlegend=False, height=280,
+                fig_fmt.update_layout(showlegend=True, height=300,
                                       margin=dict(t=10,b=5,l=5,r=5),
                                       paper_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig_fmt, use_container_width=True)
-            with fc2:
-                st.markdown('<div class="section-header">💡 Format Upgrade Opportunities</div>',
-                            unsafe_allow_html=True)
-                webp_opps = im.get("non_webp_jpg_png", 0)
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-radius:10px;padding:16px'>
-                    <div style='font-size:.85rem;color:var(--seo-text,#374151);margin-bottom:10px'>
-                        <b>{webp_opps}</b> image(s) in legacy format (PNG/JPEG) could be converted to WebP.
-                    </div>
-                    <div style='font-size:.78rem;color:var(--seo-muted,#64748B)'>
-                        <b>WebP</b> offers 25–35% smaller file sizes than JPEG and 26% smaller than PNG at equivalent quality.<br><br>
-                        <b>AVIF</b> offers even better compression (up to 50% smaller than JPEG) and is supported in all modern browsers.
-                    </div>
-                    <div style='margin-top:10px'>
-                        <span style='background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600'>
-                            ✅ Already WebP: {fmts.get("WebP",0)}</span>
-                        &nbsp;
-                        <span style='background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600'>
-                            ⚠️ Needs conversion: {webp_opps}</span>
-                    </div>
-                </div>""", unsafe_allow_html=True)
 
-                # Alt text quality pie
-                st.markdown('<div class="section-header" style="margin-top:14px">🏷️ Alt Text Quality</div>',
-                            unsafe_allow_html=True)
+                # Alt text quality pie below format
+                st.markdown('<div class="section-header">🏷️ Alt Text Quality</div>', unsafe_allow_html=True)
                 alt_counts = {
-                    "OK":       sum(1 for i in images if i.get("alt_status")=="ok"),
-                    "Missing":  im.get("missing_alt",0),
-                    "Empty":    im.get("empty_alt",0),
-                    "Generic":  im.get("generic_alt",0),
-                    "Stuffed":  im.get("keyword_stuffed_alt",0),
+                    "OK":      sum(1 for i in images if i.get("alt_status") == "ok"),
+                    "Missing": im.get("missing_alt",0),
+                    "Empty":   im.get("empty_alt",0),
+                    "Generic": im.get("generic_alt",0),
+                    "Stuffed": im.get("keyword_stuffed_alt",0),
                 }
                 fig_alt = go.Figure(go.Pie(
                     labels=list(alt_counts.keys()), values=list(alt_counts.values()), hole=0.5,
                     marker_colors=["#10B981","#EF4444","#F97316","#F59E0B","#8B5CF6"],
                 ))
-                fig_alt.update_traces(textinfo="label+value", textfont_size=11)
-                fig_alt.update_layout(showlegend=False, height=220,
+                fig_alt.update_traces(textinfo="label+value+percent", textfont_size=11)
+                fig_alt.update_layout(showlegend=True, height=260,
                                       margin=dict(t=5,b=5,l=5,r=5),
                                       paper_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig_alt, use_container_width=True)
+
+            with fc2:
+                st.markdown('<div class="section-header">💡 Format Upgrade Opportunities</div>', unsafe_allow_html=True)
+                webp_opps = im.get("non_webp_jpg_png", 0)
+                st.markdown(f"""
+                <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                     border-radius:10px;padding:16px;margin-bottom:14px'>
+                    <div style='font-size:.85rem;color:var(--seo-text,#374151);margin-bottom:10px'>
+                        <b>{webp_opps}</b> image(s) in legacy format (PNG/JPEG) — convert to WebP or AVIF.
+                    </div>
+                    <div style='font-size:.78rem;color:var(--seo-muted,#64748B);line-height:1.6'>
+                        <b>WebP</b> → 25–35% smaller than JPEG, 26% smaller than PNG<br>
+                        <b>AVIF</b> → up to 50% smaller than JPEG, supported in all modern browsers
+                    </div>
+                    <div style='margin-top:12px;display:flex;gap:8px;flex-wrap:wrap'>
+                        <span style='background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600'>✅ WebP: {fmts.get("WebP",0)}</span>
+                        <span style='background:#CFFAFE;color:#0E7490;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600'>✅ AVIF: {fmts.get("AVIF",0)}</span>
+                        <span style='background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600'>⚠️ Needs conversion: {webp_opps}</span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+                # Lazy load breakdown
+                st.markdown('<div class="section-header">⚡ Lazy Load Status</div>', unsafe_allow_html=True)
+                lazy_yes = sum(1 for i in images if i.get("has_lazy"))
+                lazy_no  = len(images) - lazy_yes
+                fig_lazy = go.Figure(go.Pie(
+                    labels=["Has Lazy Load", "Missing Lazy Load"],
+                    values=[lazy_yes, lazy_no], hole=0.5,
+                    marker_colors=["#10B981","#EF4444"],
+                ))
+                fig_lazy.update_traces(textinfo="label+value+percent", textfont_size=11)
+                fig_lazy.update_layout(showlegend=False, height=220,
+                                       margin=dict(t=5,b=5,l=5,r=5),
+                                       paper_bgcolor="rgba(0,0,0,0)")
+                st.plotly_chart(fig_lazy, use_container_width=True)
+
+                # Dimensions breakdown
+                st.markdown('<div class="section-header">📐 Dimensions Specified</div>', unsafe_allow_html=True)
+                dims_yes = sum(1 for i in images if i.get("has_dimensions"))
+                dims_no  = len(images) - dims_yes
+                fig_dims = go.Figure(go.Pie(
+                    labels=["Has Dimensions", "Missing Dimensions"],
+                    values=[dims_yes, dims_no], hole=0.5,
+                    marker_colors=["#3B82F6","#F97316"],
+                ))
+                fig_dims.update_traces(textinfo="label+value+percent", textfont_size=11)
+                fig_dims.update_layout(showlegend=False, height=220,
+                                       margin=dict(t=5,b=5,l=5,r=5),
+                                       paper_bgcolor="rgba(0,0,0,0)")
+                st.plotly_chart(fig_dims, use_container_width=True)
 
     # ── Tab: Issues ───────────────────────────────────────────────────────
     with tab_issues:
@@ -3348,11 +3444,13 @@ def page_image_seo():
                               font-size:.7rem;font-weight:700'>{sev}</span>
                         <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
                             {iss.get("issue","")}</span>
+                        <span style='margin-left:auto;font-size:.78rem;font-weight:700;color:{sev_c}'>
+                            Impact {iss.get("impact_score",0)}/10</span>
                     </div>
                     <div style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
                         ✅ {iss.get("recommendation","")}</div>
                     <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
-                        Impact: {iss.get("impact_score",0)}/10 &nbsp;·&nbsp; Effort: {iss.get("effort","—")}
+                        Effort: {iss.get("effort","—")}
                     </div>
                 </div>""", unsafe_allow_html=True)
 
