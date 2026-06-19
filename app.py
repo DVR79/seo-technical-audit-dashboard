@@ -3209,11 +3209,12 @@ def _page_image_seo_body():
     if not _lcp_url and _raster:
         _lcp_url = _raster[0]["url"]
 
-    # ── Sizes cache: {url: bytes_or_None} stored separately from audit data ─
-    _sz_cache_key = f"img_sizes_{sel}"
-    _sz_cache = st.session_state.get(_sz_cache_key, {})
+    # ── Sizes cache ───────────────────────────────────────────────────────────
+    _sz_cache_key   = f"img_sizes_{sel}"
+    _sz_auto_key    = f"img_sizes_auto_{sel}"   # flag: auto-fetch already attempted
+    _sz_cache       = st.session_state.get(_sz_cache_key, {})
 
-    # Pre-populate cache from audit data (sizes fetched during initial audit)
+    # 1. Pull from audit data (populated when check_sizes=True on new audits)
     if not _sz_cache:
         _audit_sizes = {
             img["url"]: img["file_size_bytes"]
@@ -3224,8 +3225,8 @@ def _page_image_seo_body():
             st.session_state[_sz_cache_key] = _audit_sizes
             _sz_cache = _audit_sizes
 
-    # Also merge PSI image sizes (PSI uses real Chrome — bypasses CDN bot-protection)
-    _psi_for_url = st.session_state.get(f"psi_live_{urls[sel]}", {})
+    # 2. Merge PSI image sizes (real Chrome bypasses CDN bot-protection)
+    _psi_for_url   = st.session_state.get(f"psi_live_{urls[sel]}", {})
     _psi_img_sizes = _psi_for_url.get("image_sizes", {}) if _psi_for_url.get("success") else {}
     if _psi_img_sizes:
         _merged = {**_sz_cache, **{k: v for k, v in _psi_img_sizes.items() if v}}
@@ -3233,8 +3234,28 @@ def _page_image_seo_body():
             st.session_state[_sz_cache_key] = _merged
             _sz_cache = _merged
 
+    # 3. Auto-fetch on first visit if cache still empty (old audit data)
+    if not _sz_cache and not st.session_state.get(_sz_auto_key):
+        st.session_state[_sz_auto_key] = True
+        _http_urls = list({img["url"] for img in images
+                           if img.get("url", "").startswith("http")})[:60]
+        if _http_urls:
+            from modules.image_auditor import _fetch_size
+            from concurrent.futures import ThreadPoolExecutor
+            from functools import partial
+            _ph = st.empty()
+            _ph.info(f"Fetching file sizes for {len(_http_urls)} images…")
+            _fetch_fn = partial(_fetch_size, referer=urls[sel])
+            with ThreadPoolExecutor(max_workers=10) as _exe:
+                _raw = list(_exe.map(_fetch_fn, _http_urls))
+            _auto_sizes = {u: sz for u, sz in _raw if sz}
+            if _auto_sizes:
+                st.session_state[_sz_cache_key] = _auto_sizes
+                _sz_cache = _auto_sizes
+            _ph.empty()
+
     _sizes_fetched = bool(_sz_cache)
-    _large_count = sum(1 for v in _sz_cache.values() if v is not None and v > 200 * 1024)
+    _large_count   = sum(1 for v in _sz_cache.values() if v is not None and v > 200 * 1024)
 
     # ── KPI cards — clickable to filter table ─────────────────────────────
     if "img_filter" not in st.session_state:
