@@ -3346,11 +3346,11 @@ def page_image_seo():
                 _sz_bytes = img.get("file_size_bytes")
                 _sz_raw   = img.get("file_size_label","—")
                 if _sz_bytes is not None and _sz_bytes > 200 * 1024:
-                    size_lbl = f"<span style='color:#EF4444;font-weight:700'>{_sz_raw} ⚠</span>"
+                    size_lbl = f"<b style=\"color:#EF4444\">{_sz_raw} ⚠</b>"
                 elif _sz_bytes is not None:
-                    size_lbl = f"<span style='color:#10B981;font-weight:600'>{_sz_raw}</span>"
+                    size_lbl = f"<b style=\"color:#10B981\">{_sz_raw}</b>"
                 else:
-                    size_lbl = "<span style='color:var(--seo-muted,#64748B)'>—</span>"
+                    size_lbl = "—"
 
                 # LCP candidate badge
                 _is_lcp = (raw_url and raw_url == _lcp_url)
@@ -3364,23 +3364,20 @@ def page_image_seo():
                 else:
                     thumb = f"<span style='display:inline-block;width:36px;height:36px;background:#F1F5F9;border-radius:4px;text-align:center;line-height:36px;font-size:.65rem;color:#94A3B8'>{fmt[:3]}</span>"
 
-                _row_bg = "background:rgba(124,58,237,.06)" if _is_lcp else ""
+                _row_bg = "background:rgba(124,58,237,.06);" if _is_lcp else ""
                 rows_html += f"""
                 <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.12));{_row_bg}'>
                     <td style='padding:6px 8px;text-align:center;width:44px'>{thumb}</td>
                     <td style='padding:6px 8px;max-width:220px'>
-                        <div style='display:flex;align-items:center;flex-wrap:wrap;gap:3px'>
-                            <a href='{raw_url}' target='_blank' style='font-size:.73rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none;word-break:break-all' title='{raw_url}'>{url_label}</a>
-                            {lcp_badge}
-                        </div>
-                        <div style='font-size:.67rem;color:var(--seo-muted,#64748B);margin-top:1px'>{disp_name}{name_q}</div>
+                        <a href='{raw_url}' target='_blank' style='font-size:.73rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none;word-break:break-all' title='{raw_url}'>{url_label}</a>{lcp_badge}
+                        <span style='display:block;font-size:.67rem;color:var(--seo-muted,#64748B);margin-top:1px'>{disp_name}{name_q}</span>
                     </td>
                     <td style='padding:6px 8px;text-align:center'>{fmt_b}</td>
                     <td style='padding:6px 8px;font-size:.72rem;text-align:center'>{size_lbl}</td>
                     <td style='padding:6px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>{dims_val}</td>
                     <td style='padding:6px 8px;max-width:200px'>
                         {alt_b}
-                        <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{alt_disp}</div>
+                        <span style='display:block;font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>{alt_disp}</span>
                     </td>
                     <td style='padding:6px 8px;text-align:center'>{lazy_b}</td>
                     <td style='padding:6px 8px;text-align:center'>{srcset_b}</td>
