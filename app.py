@@ -3,13 +3,17 @@
 import io
 import re
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
+from modules.image_auditor import _fetch_size
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -137,6 +141,44 @@ def _rel_badge(is_dofollow, is_nofollow, is_sponsored, is_ugc):
     if is_nofollow:
         return "<span style='background:#FEE2E2;color:#991B1B;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Nofollow</span>"
     return "<span style='background:#D1FAE5;color:#065F46;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700'>Dofollow</span>"
+
+
+def _cwv_color(label):
+    """Shared CWV color helper: returns (bg, fg) tuple."""
+    l = label or ""
+    if "Good" in l or l == "Low":     return ("#D1FAE5", "#065F46")
+    if "Needs" in l or l == "Medium": return ("#FEF3C7", "#92400E")
+    return ("#FEE2E2", "#991B1B")
+
+
+_SEV_COLORS = {
+    "Critical": "#EF4444", "High": "#F97316",
+    "Warning": "#F59E0B", "Medium": "#EAB308", "Low": "#3B82F6",
+}
+
+def _render_issue_card(iss):
+    """Shared issue card renderer used across all audit pages."""
+    sev   = iss.get("severity", "Low")
+    sev_c = _SEV_COLORS.get(sev, "#6B7280")
+    st.markdown(f"""
+    <div style='background:var(--seo-card-bg,#fff);border-left:5px solid {sev_c};
+         border-radius:0 10px 10px 0;padding:12px 16px;margin-bottom:8px;
+         border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+        <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
+            <span style='background:{sev_c};color:#fff;padding:2px 10px;border-radius:999px;
+                  font-size:.7rem;font-weight:700'>{sev}</span>
+            <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
+                {iss.get("issue","")}</span>
+            <span style='margin-left:auto;font-size:.75rem;font-weight:700;color:{sev_c}'>
+                Impact {iss.get("impact_score",0)}/10</span>
+        </div>
+        <div style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
+            ✅ {iss.get("recommendation","")}</div>
+        <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
+            Effort: {iss.get("effort","—")}
+            &nbsp;·&nbsp; Category: {iss.get("category","—")}
+        </div>
+    </div>""", unsafe_allow_html=True)
 
 
 def render_link_table(links, show_source=False, source_label="Source", max_rows=100, key_prefix="lnk"):
@@ -806,10 +848,6 @@ def render_inline_result(r):
         st.markdown('<div class="section-header">📊 Core Web Vitals Estimates</div>', unsafe_allow_html=True)
         st.caption("These are heuristic estimates based on response time and page size — not real field data.")
 
-        def _cwv_color(label):
-            if "Good" in label: return ("#D1FAE5", "#065F46")
-            if "Needs" in label: return ("#FEF3C7", "#92400E")
-            return ("#FEE2E2", "#991B1B")
 
         cwv1, cwv2, cwv3 = st.columns(3)
         ttfb_est = _tech.get("cwv_ttfb_estimate", "—")
@@ -1157,7 +1195,7 @@ def page_dashboard():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Crawlability Status ───────────────────────────────────────────────
-    idx_count  = sum(1 for r in results if not r.get("indexability",{}).get("is_noindex",False))
+    idx_count  = sum(1 for r in results if r.get("indexability",{}).get("is_indexable", True))
     noindex_c  = total - idx_count
     redirect_c = sum(1 for r in results if r.get("redirect_count",0) > 0)
     amp_c      = sum(1 for r in results if r.get("technical_seo",{}).get("has_amp",False))
@@ -1197,7 +1235,7 @@ def page_dashboard():
         for idx_qw, qw in enumerate(quick_wins):
             sev   = qw.get("severity","Low")
             imp   = qw.get("impact_score",0)
-            sev_c = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B","Medium":"#EAB308","Low":"#3B82F6"}.get(sev,"#6B7280")
+            sev_c = _SEV_COLORS.get(sev,"#6B7280")
             with qw_cols[idx_qw % 2]:
                 st.markdown(f"""
                 <div class='qw-card'>
@@ -1728,10 +1766,6 @@ def page_url_detail():
         st.markdown('<div class="section-header">📊 Core Web Vitals Estimates</div>', unsafe_allow_html=True)
         st.caption("Heuristic estimates based on response time and page size — not real field data.")
 
-        def _cwv_col(label):
-            if "Good" in (label or ""): return ("#D1FAE5", "#065F46")
-            if "Needs" in (label or "") or "Low" in (label or ""): return ("#FEF3C7", "#92400E")
-            return ("#FEE2E2", "#991B1B")
 
         wv1, wv2, wv3 = st.columns(3)
         for wcol, mname, mval in [
@@ -1739,7 +1773,7 @@ def page_url_detail():
             (wv2, "LCP (Largest Contentful Paint)", _t.get("cwv_lcp_estimate", "—")),
             (wv3, "CLS Risk (Layout Shift)", _t.get("cwv_cls_risk", "—")),
         ]:
-            bg, fg = _cwv_col(mval)
+            bg, fg = _cwv_color(mval)
             wcol.markdown(
                 f"<div style='background:{bg};color:{fg};border-radius:10px;padding:14px 16px;text-align:center'>"
                 f"<div style='font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em'>{mname}</div>"
@@ -2114,7 +2148,7 @@ def page_link_analysis():
 
     from modules.link_auditor import (
         get_base_domain, categorize_domain,
-        analyze_anchor_text,
+        analyze_anchor_text, get_internal_link_opportunities,
     )
 
     # ── Build flat link lists with source URL attached ────────────────────
@@ -2327,22 +2361,7 @@ def page_link_analysis():
         if all_link_issues:
             st.markdown('<div class="section-header">⚠️ Link Issues Found</div>', unsafe_allow_html=True)
             for iss in sorted(all_link_issues, key=lambda x: x.get("impact_score",0), reverse=True)[:12]:
-                sev   = iss.get("severity","Low")
-                sev_c = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
-                          "Medium":"#EAB308","Low":"#3B82F6"}.get(sev,"#6B7280")
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border-left:4px solid {sev_c};
-                     border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:6px;
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
-                    <div style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                        {iss.get("issue","")}</div>
-                    <div style='font-size:.75rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
-                        ✅ {iss.get("recommendation","")}</div>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:2px'>
-                        <span style='color:{sev_c};font-weight:700'>{sev}</span>
-                        &nbsp;·&nbsp; Impact: {iss.get("impact_score",0)}/10
-                        &nbsp;·&nbsp; Effort: {iss.get("effort","—")}</div>
-                </div>""", unsafe_allow_html=True)
+                _render_issue_card(iss)
 
     # ════════════════════════ TAB 2: INTERNAL LINKS ══════════════════════ #
     with tab_i:
@@ -2664,7 +2683,7 @@ def page_link_analysis():
             opps_sorted = sorted(opps, key=lambda x: sev_order.get(x.get("severity","Low"), 4))
             for opp in opps_sorted:
                 sev   = opp.get("severity","Low")
-                sev_c = {"Critical":"#EF4444","High":"#F97316","Medium":"#F59E0B","Low":"#3B82F6"}.get(sev,"#6B7280")
+                sev_c = _SEV_COLORS.get(sev,"#6B7280")
                 pages = opp.get("pages",[])
                 pages_html = "".join(
                     f"<div style='font-size:.72rem;color:var(--seo-info-text,#1D4ED8);margin-top:2px'>→ {p[:90]}</div>"
@@ -3133,25 +3152,7 @@ def _page_mobile_audit_body():
                         unsafe_allow_html=True)
             sev_order = {"Critical":0,"High":1,"Warning":2,"Medium":3,"Low":4}
             for iss in sorted(issues, key=lambda x: sev_order.get(x.get("severity","Low"),5)):
-                sev   = iss.get("severity","Low")
-                sev_c = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
-                          "Medium":"#EAB308","Low":"#3B82F6"}.get(sev,"#6B7280")
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border-left:5px solid {sev_c};
-                     border-radius:0 10px 10px 0;padding:12px 16px;margin-bottom:8px;
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
-                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{sev_c};color:white;padding:2px 10px;
-                              border-radius:999px;font-size:.7rem;font-weight:700'>{sev}</span>
-                        <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {iss.get("issue","")}</span>
-                    </div>
-                    <div style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
-                        ✅ {iss.get("recommendation","")}</div>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
-                        Impact: {iss.get("impact_score",0)}/10 &nbsp;·&nbsp; Effort: {iss.get("effort","—")}
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                _render_issue_card(iss)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -3240,9 +3241,6 @@ def _page_image_seo_body():
         _http_urls = list({img["url"] for img in images
                            if img.get("url", "").startswith("http")})[:60]
         if _http_urls:
-            from modules.image_auditor import _fetch_size
-            from concurrent.futures import ThreadPoolExecutor
-            from functools import partial
             _ph = st.empty()
             _ph.info(f"Fetching file sizes for {len(_http_urls)} images…")
             _fetch_fn = partial(_fetch_size, referer=urls[sel])
@@ -3308,9 +3306,6 @@ def _page_image_seo_body():
             with _btn_col:
                 if st.button("🔍 Check Real File Sizes", key=f"img_fetch_sz_{sel}",
                              help="Make HEAD requests to measure actual image file sizes"):
-                    from modules.image_auditor import _fetch_size
-                    from concurrent.futures import ThreadPoolExecutor
-                    from functools import partial
                     _page_url = urls[sel]
                     _img_urls = list({img["url"] for img in images
                                       if img.get("url", "").startswith("http")})[:60]
@@ -3619,27 +3614,7 @@ def _page_image_seo_body():
         else:
             sev_order = {"Critical":0,"High":1,"Warning":2,"Medium":3,"Low":4}
             for iss in sorted(img_issues, key=lambda x: sev_order.get(x.get("severity","Low"),5)):
-                sev   = iss.get("severity","Low")
-                sev_c = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
-                          "Medium":"#EAB308","Low":"#3B82F6"}.get(sev,"#6B7280")
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border-left:5px solid {sev_c};
-                     border-radius:0 10px 10px 0;padding:12px 16px;margin-bottom:8px;
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
-                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{sev_c};color:white;padding:2px 10px;border-radius:999px;
-                              font-size:.7rem;font-weight:700'>{sev}</span>
-                        <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {iss.get("issue","")}</span>
-                        <span style='margin-left:auto;font-size:.78rem;font-weight:700;color:{sev_c}'>
-                            Impact {iss.get("impact_score",0)}/10</span>
-                    </div>
-                    <div style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
-                        ✅ {iss.get("recommendation","")}</div>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
-                        Effort: {iss.get("effort","—")}
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                _render_issue_card(iss)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -3918,8 +3893,6 @@ def page_heading_analysis():
         else:
             sev_order = {"Critical":0,"High":1,"Warning":2,"Medium":3,"Low":4}
             sev_icon  = {"Critical":"🔴","High":"🟠","Warning":"🟡","Medium":"🟡","Low":"🔵"}
-            sev_c_map = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
-                         "Medium":"#EAB308","Low":"#3B82F6"}
             sorted_issues = sorted(hdg_issues, key=lambda x: sev_order.get(x.get("severity","Low"),5))
 
             # Summary counts row
@@ -3930,7 +3903,7 @@ def page_heading_analysis():
             _sc_cols = st.columns(len(_sev_counts) or 1)
             for _ci, (_sv, _cnt) in enumerate(sorted(_sev_counts.items(), key=lambda x: sev_order.get(x[0],5))):
                 with _sc_cols[_ci]:
-                    _cc = sev_c_map.get(_sv,"#6B7280")
+                    _cc = _SEV_COLORS.get(_sv,"#6B7280")
                     st.markdown(f"""
                     <div style='background:var(--seo-card-bg,#fff);
                          border:1px solid var(--seo-border,rgba(148,163,184,.22));
@@ -3943,9 +3916,9 @@ def page_heading_analysis():
             st.markdown("<br>", unsafe_allow_html=True)
 
             # Accordion — one expander per issue
-            for idx, iss in enumerate(sorted_issues):
+            for iss in sorted_issues:
                 sev   = iss.get("severity","Low")
-                sev_c = sev_c_map.get(sev,"#6B7280")
+                sev_c = _SEV_COLORS.get(sev,"#6B7280")
                 icon  = sev_icon.get(sev,"⚪")
                 label = f"{icon} **{sev}** — {_esc.escape(iss.get('issue',''))}"
                 with st.expander(label, expanded=False):
@@ -3963,219 +3936,6 @@ def page_heading_analysis():
                             📂 Category: <b>{iss.get("category","—")}</b>
                         </div>
                     </div>""", unsafe_allow_html=True)
-
-
-def _page_cwv_body():
-    """
-    Core Web Vitals — powered by the same pagespeed.py + psi_api_key_global
-    that the Mobile Audit uses. Cache shared at psi_live_{url}.
-    """
-    import re as _re
-    from modules.pagespeed import fetch_pagespeed
-
-    results = st.session_state.audit_results
-    if not results:
-        _no_data_info(); return
-
-    urls = [r.get("url", "") for r in results]
-
-    # ── Controls ─────────────────────────────────────────────────────────────
-    c1, c2 = st.columns([5, 2])
-    with c1:
-        sel = st.selectbox("Select URL", range(len(urls)),
-                           format_func=lambda i: urls[i][-100:], key="cwv_url_sel")
-    with c2:
-        strategy = st.selectbox("Device", ["mobile", "desktop"], key="cwv_strategy")
-
-    target_url = urls[sel]
-    cache_key  = f"psi_live_{target_url}"   # same key Mobile Audit writes to
-
-    # ── API key banner ────────────────────────────────────────────────────────
-    _api_key = st.session_state.get("psi_api_key_global", "").strip() or None
-    if _api_key:
-        _masked = _api_key[:6] + "•" * max(0, len(_api_key) - 10) + _api_key[-4:]
-        st.markdown(
-            f"<div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);"
-            f"border-radius:8px;padding:8px 14px;font-size:.8rem;color:#10B981;margin-bottom:8px'>"
-            f"✅ Using API key from Settings: <code>{_masked}</code></div>",
-            unsafe_allow_html=True)
-    else:
-        st.markdown(
-            "<div style='background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);"
-            "border-radius:8px;padding:8px 14px;font-size:.8rem;color:#F59E0B;margin-bottom:8px'>"
-            "⚠️ No API key set — go to <b>⚙️ Settings</b> to save your Google API key for "
-            "accurate results.</div>",
-            unsafe_allow_html=True)
-
-    # ── Fetch button ──────────────────────────────────────────────────────────
-    btn_col, status_col = st.columns([2, 5])
-    _psi = st.session_state.get(cache_key)
-    _has_data = bool(_psi and _psi.get("success"))
-    with btn_col:
-        _fetch = st.button("🚀 Fetch PageSpeed Insights", key=f"cwv_fetch_{sel}_{strategy}",
-                           type="primary", use_container_width=True)
-    with status_col:
-        if _has_data:
-            _src = _psi.get("source", "PageSpeed Insights")
-            st.markdown(
-                f"<div style='padding:7px 0;font-size:.78rem;color:#10B981'>"
-                f"✅ Data loaded — {_src} &nbsp;·&nbsp; Strategy: {_psi.get('strategy','—')} "
-                f"&nbsp;·&nbsp; Click button to re-fetch.</div>",
-                unsafe_allow_html=True)
-        else:
-            st.markdown(
-                "<div style='padding:7px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
-                "No data yet. Click the button to fetch from Google PageSpeed Insights (~15 s).</div>",
-                unsafe_allow_html=True)
-
-    if _fetch:
-        _ph = st.empty()
-        _ph.info(f"Calling PageSpeed Insights for **{target_url[-70:]}** ({strategy})…")
-        _result = fetch_pagespeed(target_url, strategy=strategy, api_key=_api_key)
-        if _result.get("success"):
-            _result["strategy"] = strategy
-            st.session_state[cache_key] = _result
-            _ph.empty()
-            st.rerun()
-        elif _result.get("error_code") == 429:
-            _ph.empty()
-            st.error("Rate limited — make sure the PageSpeed Insights API is enabled in your "
-                     "Google Cloud project and your key has no referrer restrictions.")
-            st.stop()
-        else:
-            _ph.empty()
-            st.error(f"PSI error: {_result.get('error','Unknown error')}")
-            st.stop()
-
-    if not _has_data:
-        st.info("Click **🚀 Fetch PageSpeed Insights** above to load real Lighthouse data.")
-        return
-
-    # ── Score summary row ─────────────────────────────────────────────────────
-    def _score_clr(s):
-        if s is None: return "#94A3B8"
-        return "#10B981" if s >= 90 else "#F59E0B" if s >= 50 else "#EF4444"
-
-    def _score_lbl(s):
-        if s is None: return "—"
-        return "Good" if s >= 90 else "Needs Improvement" if s >= 50 else "Poor"
-
-    _scores = [
-        ("⚡ Performance",   _psi.get("performance_score")),
-        ("♿ Accessibility", _psi.get("accessibility_score")),
-        ("🔍 SEO",           _psi.get("seo_score")),
-        ("✅ Best Practices",_psi.get("best_practices_score")),
-    ]
-    st.markdown("<br>", unsafe_allow_html=True)
-    _scols = st.columns(4)
-    for _sc, (_lbl, _sv) in zip(_scols, _scores):
-        _clr = _score_clr(_sv)
-        with _sc:
-            _disp = str(_sv) if _sv is not None else "—"
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);
-                 border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-top:4px solid {_clr};border-radius:10px;
-                 padding:14px;text-align:center'>
-                <div style='font-size:2rem;font-weight:900;color:{_clr}'>{_disp}</div>
-                <div style='font-size:.75rem;font-weight:700;
-                     color:var(--seo-heading,#0F172A);margin-top:4px'>{_lbl}</div>
-                <div style='font-size:.68rem;color:{_clr};margin-top:3px;font-weight:600'>
-                    {_score_lbl(_sv)}</div>
-            </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    # ── Metric cards + Opportunities tabs ────────────────────────────────────
-    tab_metrics, tab_opps = st.tabs(["📊 Core Web Vitals Metrics", "🛠️ Opportunities & Quick Wins"])
-
-    # Helper: score 0-1 → color
-    def _sc(score):
-        if score is None: return "#94A3B8"
-        return "#10B981" if score >= 0.9 else "#F59E0B" if score >= 0.5 else "#EF4444"
-
-    def _badge(score):
-        if score is None: return "— N/A"
-        return "✅ Good" if score >= 0.9 else "⚠️ Needs Improvement" if score >= 0.5 else "❌ Poor"
-
-    # ── METRICS TAB ──────────────────────────────────────────────────────────
-    with tab_metrics:
-        st.markdown(
-            "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:14px'>"
-            "Real Lighthouse scores — simulated lab environment on a mobile/desktop device.</div>",
-            unsafe_allow_html=True)
-
-        _metric_defs = [
-            ("lcp",  "🖼️ LCP",  "Largest Contentful Paint",
-             "< 2.5 s", "Time for the biggest visible image or text block to load."),
-            ("fcp",  "🎨 FCP",  "First Contentful Paint",
-             "< 1.8 s", "Time until the first text or image appears on screen."),
-            ("tbt",  "⏱️ TBT",  "Total Blocking Time",
-             "< 200 ms","Main-thread blocking time — proxy for interactivity."),
-            ("cls",  "📐 CLS",  "Cumulative Layout Shift",
-             "< 0.1",  "Unexpected visual shifts — images/ads jumping around."),
-            ("si",   "🏎️ SI",   "Speed Index",
-             "< 3.4 s", "How quickly content fills the visible page area."),
-            ("ttfb", "🌐 TTFB", "Time to First Byte",
-             "< 800 ms","Server response speed — time until first byte arrives."),
-            ("inp",  "👆 INP",  "Interaction to Next Paint",
-             "< 200 ms","Responsiveness to clicks/taps (replaces FID)."),
-        ]
-
-        _mcols = st.columns(3)
-        for _idx, (_key, _ilbl, _fname, _tgt, _desc) in enumerate(_metric_defs):
-            _m = _psi.get(_key, {})
-            _disp  = _m.get("value", "—")
-            _score = _m.get("score")
-            _clr   = _sc(_score)
-            with _mcols[_idx % 3]:
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-top:4px solid {_clr};border-radius:10px;
-                     padding:14px 14px 10px;margin-bottom:12px'>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);
-                         font-weight:600;letter-spacing:.04em;text-transform:uppercase'>{_ilbl}</div>
-                    <div style='font-size:1.5rem;font-weight:800;color:{_clr};margin:6px 0 2px'>{_disp}</div>
-                    <div style='font-size:.72rem;font-weight:700;color:{_clr}'>{_badge(_score)}</div>
-                    <div style='font-size:.68rem;color:var(--seo-muted,#64748B);
-                         margin-top:6px;line-height:1.5'>{_desc}<br><b>Target:</b> {_tgt}</div>
-                </div>""", unsafe_allow_html=True)
-
-    # ── OPPORTUNITIES TAB ─────────────────────────────────────────────────────
-    with tab_opps:
-        _opps = _psi.get("opportunities", [])
-        if not _opps:
-            st.success("✅ No significant performance opportunities found — great job!")
-        else:
-            st.markdown(
-                f"<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
-                f"<b>{len(_opps)}</b> opportunities identified by Lighthouse — fix these to improve scores.</div>",
-                unsafe_allow_html=True)
-            for _opp in _opps:
-                _s   = _opp.get("score", 0) or 0
-                _clr = "#EF4444" if _s < 0.5 else "#F59E0B"
-                _dv  = _opp.get("displayValue", "")
-                _sav = f" — {_dv}" if _dv else ""
-                _desc = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', _opp.get("description", ""))
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);
-                     border-left:5px solid {_clr};border-radius:0 10px 10px 0;
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     padding:12px 16px;margin-bottom:8px'>
-                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{_clr};color:#fff;padding:2px 10px;
-                              border-radius:999px;font-size:.7rem;font-weight:700'>
-                            {"High" if _s < 0.5 else "Medium"}</span>
-                        <b style='font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {_opp.get("title","")}</b>
-                        <span style='margin-left:auto;font-size:.75rem;
-                              color:{_clr};font-weight:700'>{_sav}</span>
-                    </div>
-                    <div style='font-size:.78rem;color:var(--seo-muted,#64748B)'>
-                        {_desc[:300]}{"…" if len(_desc) > 300 else ""}</div>
-                </div>""", unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════

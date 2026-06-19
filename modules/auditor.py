@@ -1,6 +1,7 @@
 """Core URL audit engine — fetches pages and runs all SEO checks."""
 
 import re
+import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -463,8 +464,6 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
         "all_issues": [],
     }
 
-    result["url_structure"] = analyze_url_structure(url)
-
     fetch = fetch_page(url)
     if not fetch["success"]:
         result["fetch_error"] = fetch.get("error", "Unknown error")
@@ -559,7 +558,8 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
 
     all_issues = []
     for key in ["metadata", "headings", "canonical", "indexability", "url_structure",
-                "content", "images", "advanced", "redirect_analysis",
+                "content", "images", "heading_detail", "image_detail",
+                "advanced", "redirect_analysis",
                 "internal_links", "external_links", "course_audit", "blog_audit"]:
         all_issues.extend(result.get(key, {}).get("issues", []))
     result["all_issues"] = all_issues
@@ -575,7 +575,6 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
 def audit_urls_bulk(urls, audit_type="auto", check_links=True, validate_links=False,
                     max_workers=8, progress_callback=None,
                     fetch_pagespeed=False, psi_api_key=None):
-    import threading
     results = []
     completed = 0
     lock = threading.Lock()

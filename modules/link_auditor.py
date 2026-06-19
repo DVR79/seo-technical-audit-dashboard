@@ -60,7 +60,7 @@ def get_base_domain(url):
     try:
         parsed = urlparse(url)
         netloc = parsed.netloc.lower()
-        return netloc.lstrip("www.") if netloc.startswith("www.") else netloc
+        return netloc[4:] if netloc.startswith("www.") else netloc
     except Exception:
         return ""
 
@@ -144,16 +144,6 @@ def link_health(code, domain=""):
     if code >= 400:
         return "broken"
     return "unknown"
-
-
-def status_badge_color(health):
-    return {
-        "ok":       "#10B981",
-        "redirect": "#F59E0B",
-        "blocked":  "#8B5CF6",
-        "broken":   "#EF4444",
-        "unknown":  "#94A3B8",
-    }.get(health, "#94A3B8")
 
 
 def classify_link(href, base_url):

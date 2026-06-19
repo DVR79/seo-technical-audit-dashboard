@@ -46,9 +46,6 @@ def analyze_http_headers(http_headers: dict, url: str) -> dict:
             "effort": "Medium",
         })
 
-    # Content-Type
-    content_type = h.get("content-type", "")
-
     # Content-Encoding / Compression
     content_encoding = h.get("content-encoding", "identity")
     has_compression = content_encoding.lower() in ("gzip", "br", "deflate", "zstd")
@@ -131,7 +128,6 @@ def analyze_http_headers(http_headers: dict, url: str) -> dict:
         "x_robots_noindex": x_robots_noindex,
         "cache_control": cache_control,
         "has_cache_control": has_cache_control,
-        "content_type": content_type,
         "content_encoding": content_encoding,
         "has_compression": has_compression,
         "server": server,
@@ -393,17 +389,6 @@ def analyze_technical_seo(soup, url: str, page_size_bytes: int, response_time: f
     elif external_script_count > 5:
         perf_score -= 5
     performance_score = max(0, min(100, perf_score))
-
-    # Large page + no compression combined warning
-    if page_size_kb > 500:
-        issues.append({
-            "issue": f"Large Uncompressed Page ({page_size_kb} KB) — High Bandwidth Cost",
-            "category": "Performance",
-            "severity": "High",
-            "recommendation": "Enable Brotli/gzip compression AND reduce page size. Large uncompressed pages cause poor LCP and high data costs on mobile.",
-            "impact_score": 8,
-            "effort": "Medium",
-        })
 
     return {
         "page_size_kb": page_size_kb,

@@ -21,7 +21,8 @@ GOOD_BLOG_WORDS = 1500
 
 def audit_blog_page(soup, url):
     issues = []
-    page_text = soup.get_text().lower()
+    raw_text  = soup.get_text(separator=" ")
+    page_text = raw_text.lower()
 
     # Blog elements
     elements_found = {}
@@ -54,9 +55,8 @@ def audit_blog_page(soup, url):
                 "recommendation": f"Add '{element_name}' to improve content quality and E-E-A-T signals.",
             })
 
-    # Word count
-    text = soup.get_text(separator=" ")
-    words = [w for w in text.split() if len(w) > 1]
+    # Word count — reuse raw_text from above
+    words = [w for w in raw_text.split() if len(w) > 1]
     word_count = len(words)
     reading_time = round(word_count / 200, 1)
 
@@ -103,7 +103,7 @@ def audit_blog_page(soup, url):
         })
 
     # Readability
-    sentences = re.split(r"[.!?]+", text)
+    sentences = re.split(r"[.!?]+", raw_text)
     sentence_count = max(len([s for s in sentences if len(s.strip()) > 10]), 1)
     avg_sentence_len = round(word_count / sentence_count, 1)
     readability = "Good"

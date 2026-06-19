@@ -101,22 +101,3 @@ def get_top_issues_by_impact(all_issues, top_n=10):
     return sorted_issues[:top_n]
 
 
-def get_score_label(score):
-    if score >= 90:  return "Excellent"
-    if score >= 75:  return "Good"
-    if score >= 50:  return "Needs Attention"
-    return "Critical"
-
-
-def get_score_color(score):
-    if score >= 90:  return "#10B981"
-    if score >= 75:  return "#3B82F6"
-    if score >= 50:  return "#F59E0B"
-    return "#EF4444"
-
-
-def get_severity_color(severity):
-    return {
-        "Critical": "#EF4444", "High": "#F97316",
-        "Warning":  "#F59E0B", "Medium": "#EAB308", "Low": "#3B82F6",
-    }.get(severity, "#6B7280")
