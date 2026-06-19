@@ -3406,33 +3406,30 @@ def page_image_seo():
 
             # ── LCP recommendation card ───────────────────────────────────
             if _lcp_url:
-                _lcp_name = _lcp_url.split("/")[-1][:60] or _lcp_url[-60:]
-                _preload_snip = f'&lt;link rel="preload" as="image" href="{_lcp_url}" fetchpriority="high"&gt;'
-                st.markdown(f"""
-                <div style='margin-top:16px;background:var(--seo-card-bg,#fff);
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-left:5px solid #7C3AED;border-radius:0 10px 10px 0;padding:14px 16px'>
-                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>
-                        <span style='background:#7C3AED;color:#fff;padding:3px 10px;border-radius:999px;
-                              font-size:.72rem;font-weight:700'>⚡ LCP Candidate</span>
-                        <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            Largest Contentful Paint Optimisation</span>
+                _lcp_name = _lcp_url.split("/")[-1][:80] or _lcp_url[-80:]
+                st.markdown("""
+                <div style='margin-top:16px;border-left:5px solid #7C3AED;
+                     border-radius:0 10px 10px 0;padding:12px 16px 4px 16px;
+                     background:var(--seo-card-bg,#fff);
+                     border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>
+                        <span style='background:#7C3AED;color:#fff;padding:3px 10px;
+                              border-radius:999px;font-size:.72rem;font-weight:700'>
+                            ⚡ LCP Candidate</span>
+                        <b style='font-size:.88rem;color:var(--seo-heading,#0F172A)'>
+                            Largest Contentful Paint Optimisation</b>
                     </div>
-                    <div style='font-size:.8rem;color:var(--seo-text,#374151);margin-bottom:10px'>
-                        The image highlighted in <b style='color:#7C3AED'>purple</b> is likely the LCP element on this page.
-                        Add a <code>&lt;link rel="preload"&gt;</code> in your <code>&lt;head&gt;</code> to instruct the browser
-                        to fetch it early, improving LCP score.
-                    </div>
-                    <div style='background:var(--seo-code-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                         border-radius:6px;padding:10px 14px;font-family:monospace;font-size:.75rem;
-                         color:var(--seo-text,#374151);overflow-x:auto;white-space:nowrap'>
-                        {_preload_snip}
-                    </div>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:8px'>
-                        📌 Image: <span style='color:var(--seo-info-text,#1D4ED8)'>{_lcp_name}</span>
-                        &nbsp;|&nbsp; Add <code>fetchpriority="high"</code> to the <code>&lt;img&gt;</code> tag too.
-                    </div>
+                    <p style='font-size:.8rem;color:var(--seo-text,#374151);margin:0 0 6px 0'>
+                        This image is likely the LCP element on the page. Paste the snippet below
+                        into your page <code>&lt;head&gt;</code> to preload it early and improve
+                        your LCP score. Also add <code>fetchpriority="high"</code> on the
+                        <code>&lt;img&gt;</code> tag itself.
+                    </p>
                 </div>""", unsafe_allow_html=True)
+                st.code(
+                    f'<link rel="preload" as="image" href="{_lcp_url}" fetchpriority="high">',
+                    language="html",
+                )
 
     # ── Tab: Format Analysis ─────────────────────────────────────────────
     with tab_fmt:
