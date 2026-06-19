@@ -3647,6 +3647,7 @@ def _page_image_seo_body():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_heading_analysis():
+    import html as _esc
     st.markdown(
         "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📝 Heading Structure Audit</h2>",
         unsafe_allow_html=True,
@@ -3655,7 +3656,9 @@ def page_heading_analysis():
     if not results:
         _no_data_info(); return
 
-    # ── Overview table across all URLs ───────────────────────────────────
+    urls = [r.get("url","") for r in results]
+
+    # ── Overview table ────────────────────────────────────────────────────
     st.markdown('<div class="section-header">📊 Heading Audit Overview — All URLs</div>',
                 unsafe_allow_html=True)
     ov_rows = []
@@ -3663,20 +3666,19 @@ def page_heading_analysis():
         hd = r.get("heading_detail", {})
         c  = hd.get("counts", {})
         ov_rows.append({
-            "URL":            r.get("url","")[-70:],
+            "URL":             r.get("url","")[-70:],
+            "H1 Text":         (hd.get("h1_text","") or "❌ Missing")[:80],
             "H1": c.get("h1",0), "H2": c.get("h2",0), "H3": c.get("h3",0),
-            "H4": c.get("h4",0), "H5": c.get("h5",0), "H6": c.get("h6",0),
-            "Total":          hd.get("total_headings",0),
-            "Sequence Errors":len(hd.get("sequence_violations",[])),
-            "Empty":          len(hd.get("empty_headings",[])),
-            "Issues":         len(hd.get("issues",[])),
+            "Total":           hd.get("total_headings",0),
+            "Seq. Errors":     len(hd.get("sequence_violations",[])),
+            "Empty":           len(hd.get("empty_headings",[])),
+            "Issues":          len(hd.get("issues",[])),
         })
     st.dataframe(pd.DataFrame(ov_rows), use_container_width=True, hide_index=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Per-URL deep dive ─────────────────────────────────────────────────
-    urls = [r.get("url","") for r in results]
+    # ── Per-URL selector ──────────────────────────────────────────────────
     sel  = st.selectbox("Select URL for detailed analysis", range(len(urls)),
                         format_func=lambda i: urls[i][-90:], key="hdg_url_sel")
     r    = results[sel]
@@ -3686,58 +3688,60 @@ def page_heading_analysis():
         st.warning("Heading audit data not available. Please re-run the audit.")
         return
 
-    counts = hd.get("counts", {})
+    counts   = hd.get("counts", {})
     headings = hd.get("headings", [])
 
-    # KPI strip
+    # ── KPI strip (B3 fixed: is_ok only drives color, H2/H3 green only when >0) ──
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     _hd_kpis = [
-        (k1,"H1",counts.get("h1",0), "#1E40AF", counts.get("h1",0)==1),
-        (k2,"H2",counts.get("h2",0), "#047857", True),
-        (k3,"H3",counts.get("h3",0), "#92400E", True),
-        (k4,"Sequence Errors",len(hd.get("sequence_violations",[])), "#EF4444", len(hd.get("sequence_violations",[]))==0),
-        (k5,"Empty Headings",len(hd.get("empty_headings",[])), "#F97316", len(hd.get("empty_headings",[]))==0),
-        (k6,"Issues",len(hd.get("issues",[])), "#8B5CF6", len(hd.get("issues",[]))==0),
+        (k1, "H1",             counts.get("h1",0), "#1E40AF", counts.get("h1",0) == 1),
+        (k2, "H2",             counts.get("h2",0), "#EF4444", counts.get("h2",0) > 0),
+        (k3, "H3",             counts.get("h3",0), "#92400E", counts.get("h3",0) > 0),
+        (k4, "Seq. Errors",    len(hd.get("sequence_violations",[])), "#EF4444", len(hd.get("sequence_violations",[]))==0),
+        (k5, "Empty Headings", len(hd.get("empty_headings",[])),      "#F97316", len(hd.get("empty_headings",[]))==0),
+        (k6, "Issues",         len(hd.get("issues",[])),              "#8B5CF6", len(hd.get("issues",[]))==0),
     ]
     for col, lbl, val, clr, is_ok in _hd_kpis:
-        display_clr = "#10B981" if (is_ok and val >= 0) else clr
+        display_clr = "#10B981" if is_ok else clr
         with col:
             st.markdown(f"""
             <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:14px;text-align:center'>
+                 border-top:3px solid {display_clr};border-radius:10px;padding:14px;text-align:center'>
                 <div style='font-size:1.5rem;font-weight:800;color:{display_clr}'>{val}</div>
                 <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>{lbl}</div>
             </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    tab_tree, tab_table, tab_issues = st.tabs(["🌳 Hierarchy Tree", "📋 Full Heading List", "⚠️ Issues"])
+    tab_tree, tab_table, tab_h1s, tab_issues = st.tabs([
+        "🌳 Hierarchy Tree", "📋 Heading List", "🔑 H1 Across Site", "⚠️ Issues"
+    ])
 
-    # ── Tab: Tree ─────────────────────────────────────────────────────────
+    # ── Tab: Hierarchy Tree ───────────────────────────────────────────────
     with tab_tree:
-        st.markdown('<div class="section-header">🌳 Heading Hierarchy Visualization</div>',
-                    unsafe_allow_html=True)
-
-        # H1 highlighted at top
         h1_text = hd.get("h1_text","")
         if h1_text:
+            _len_clr = "#EF4444" if len(h1_text) > 70 else "#10B981"
             st.markdown(f"""
             <div style='background:rgba(30,64,175,.08);border:2px solid #1E40AF;border-radius:10px;
                  padding:14px 18px;margin-bottom:12px'>
-                <span style='font-size:.72rem;font-weight:700;color:#1E40AF;text-transform:uppercase;
-                      letter-spacing:.06em'>H1 — Primary Heading</span>
-                <div style='font-size:1.05rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-top:4px'>
-                    {h1_text[:120]}</div>
+                <div style='display:flex;justify-content:space-between;align-items:center'>
+                    <span style='font-size:.72rem;font-weight:700;color:#1E40AF;
+                          text-transform:uppercase;letter-spacing:.06em'>H1 — Primary Heading</span>
+                    <span style='font-size:.72rem;font-weight:700;color:{_len_clr}'>
+                        {len(h1_text)} chars {"⚠ Over 70" if len(h1_text) > 70 else "✓"}</span>
+                </div>
+                <div style='font-size:1.05rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-top:6px'>
+                    {_esc.escape(h1_text)}</div>
             </div>""", unsafe_allow_html=True)
         else:
-            st.error("❌ No H1 tag found on this page.")
+            st.error("❌ No H1 tag found on this page — add one with your primary keyword.")
 
-        # Visual tree
         tree_html = hd.get("tree_html","")
         if tree_html:
             st.markdown(f"""
             <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:16px 20px;font-family:monospace;font-size:.82rem;
+                 border-radius:10px;padding:16px 20px;font-size:.82rem;
                  line-height:1.8;overflow-x:auto'>{tree_html}</div>""",
                 unsafe_allow_html=True)
 
@@ -3748,90 +3752,169 @@ def page_heading_analysis():
                         unsafe_allow_html=True)
             for v in violations:
                 st.markdown(f"""
-                <div style='background:var(--sev-warning-bg,rgba(245,158,11,.10));border-left:4px solid #F59E0B;
+                <div style='background:rgba(245,158,11,.10);border-left:4px solid #F59E0B;
                      border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:6px'>
                     <b>Position {v.get("position","?")}:</b>
                     H{v.get("from_level","?")} → H{v.get("to_level","?")} skips a level &nbsp;
                     <span style='color:var(--seo-muted,#64748B);font-size:.8rem'>
-                        "{(v.get("heading_text") or "")[:70]}"</span><br>
-                    <span style='font-size:.75rem;color:var(--seo-info-text,#1D4ED8)'>
-                        ✅ Add an H{v.get("from_level",1)+1} heading before this H{v.get("to_level","?")}
-                        to maintain correct document structure.</span>
+                        "{_esc.escape((v.get("heading_text") or "")[:70])}"</span><br>
+                    <span style='font-size:.75rem;color:#1D4ED8'>
+                        ✅ Add H{v.get("from_level",1)+1} before this H{v.get("to_level","?")}
+                        to keep the outline sequential.</span>
                 </div>""", unsafe_allow_html=True)
         else:
-            st.success("✅ No heading sequence violations found — heading hierarchy is correct.")
+            st.success("✅ No heading sequence violations — hierarchy is correct.")
 
-        # Keyword coverage
+        # Keyword coverage (B1 fixed: derive lists from {kw: bool} dict)
         kw = hd.get("keyword_coverage", {})
         if kw:
-            st.markdown('<div class="section-header" style="margin-top:16px">🔍 Keyword Coverage</div>',
+            found_in   = [k for k, v in kw.items() if v]
+            missing_kw = [k for k, v in kw.items() if not v]
+            st.markdown('<div class="section-header" style="margin-top:16px">🔍 Title Keyword Coverage in H1/H2</div>',
                         unsafe_allow_html=True)
             kc1, kc2 = st.columns(2)
             with kc1:
-                found_in = kw.get("found_in", [])
                 if found_in:
-                    st.success(f"✅ Title keywords found in headings: **{', '.join(found_in)}**")
+                    st.success(f"✅ Found in headings: **{', '.join(found_in)}**")
                 else:
-                    st.warning("⚠️ No title keywords detected in H1/H2 headings.")
+                    st.warning("⚠️ No title keywords found in H1/H2 headings.")
             with kc2:
-                missing_kw = kw.get("missing_from_headings", [])
                 if missing_kw:
-                    st.info(f"💡 Consider working these keywords into your H2s: **{', '.join(missing_kw[:5])}**")
+                    st.info(f"💡 Missing from headings: **{', '.join(missing_kw[:5])}**")
 
         # Duplicates
         dupes = hd.get("duplicate_headings", {})
-        has_dupes = any(dupes.values())
-        if has_dupes:
+        if any(dupes.values()):
             st.markdown('<div class="section-header" style="margin-top:16px">🔁 Duplicate Headings</div>',
                         unsafe_allow_html=True)
             for level, dup_list in dupes.items():
-                if dup_list:
-                    for dup in dup_list:
-                        st.warning(f"**{level.upper()}** duplicated heading: \"{str(dup)[:80]}\"")
+                for dup in (dup_list or []):
+                    st.warning(f"**{level.upper()}** duplicate: \"{_esc.escape(str(dup)[:80])}\"")
 
-    # ── Tab: Full heading list ─────────────────────────────────────────────
+    # ── Tab: Full Heading List ─────────────────────────────────────────────
     with tab_table:
-        st.markdown('<div class="section-header">📋 All Headings</div>', unsafe_allow_html=True)
         if not headings:
-            st.info("No headings found.")
+            st.info("No headings found on this page.")
         else:
+            # CSV export
+            import io as _io
+            _csv_lines = ["Level,Text,Length,Position"]
+            for h in headings:
+                _csv_lines.append(
+                    f'H{h["level"]},"{h["text"].replace(chr(34), chr(39))}",{h["length"]},{h["position"]}'
+                )
+            st.download_button(
+                "⬇️ Download Headings CSV",
+                data="\n".join(_csv_lines),
+                file_name=f"headings_{urls[sel].split('/')[-1] or 'page'}.csv",
+                mime="text/csv",
+                key=f"hdg_csv_{sel}",
+            )
+
             level_color = {1:"#1E40AF",2:"#047857",3:"#92400E",4:"#6B21A8",5:"#9D174D",6:"#374151"}
             rows_html = ""
             for h in headings:
-                lv    = h.get("level",1)
-                clr   = level_color.get(lv,"#374151")
-                txt   = h.get("text","")[:100] or "<em style='color:var(--seo-muted,#64748B)'>[Empty]</em>"
-                pos   = h.get("position","")
-                empty = "⚠️ Empty" if h.get("is_empty") else ""
-                lg    = h.get("length",0)
+                lv  = h.get("level",1)
+                clr = level_color.get(lv,"#374151")
+                lg  = h.get("length",0)
+                # Length badge: red if >70 chars, amber if 1-9 chars, green otherwise
+                if lg > 70:
+                    len_clr, len_tip = "#EF4444", "Too long (>70 chars)"
+                elif 0 < lg < 10:
+                    len_clr, len_tip = "#F59E0B", "Too short (<10 chars)"
+                elif lg == 0:
+                    len_clr, len_tip = "#EF4444", "Empty"
+                else:
+                    len_clr, len_tip = "#10B981", "Good length"
+                txt  = _esc.escape(h.get("text","")[:120]) if not h.get("is_empty") else \
+                       "<em style='color:#EF4444;font-size:.8rem'>[Empty]</em>"
                 rows_html += f"""
                 <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.12))'>
-                    <td style='padding:8px 10px;text-align:center'>
-                        <span style='background:{clr};color:white;padding:3px 10px;border-radius:6px;
-                              font-size:.75rem;font-weight:700'>H{lv}</span></td>
-                    <td style='padding:8px 10px;font-size:.83rem;color:var(--seo-text,#374151)'>{txt} {empty}</td>
-                    <td style='padding:8px 10px;text-align:center;font-size:.75rem;color:var(--seo-muted,#64748B)'>{pos}</td>
-                    <td style='padding:8px 10px;text-align:center;font-size:.75rem;color:var(--seo-muted,#64748B)'>{lg} chars</td>
+                    <td style='padding:8px 10px;text-align:center;width:56px'>
+                        <span style='background:{clr};color:#fff;padding:3px 10px;
+                              border-radius:6px;font-size:.75rem;font-weight:700'>H{lv}</span></td>
+                    <td style='padding:8px 12px;font-size:.83rem;color:var(--seo-text,#374151)'>{txt}</td>
+                    <td style='padding:8px 10px;text-align:center;font-size:.73rem;
+                         font-weight:700;color:{len_clr}' title='{len_tip}'>{lg}ch</td>
+                    <td style='padding:8px 10px;text-align:center;font-size:.72rem;
+                         color:var(--seo-muted,#64748B)'>#{h.get("position",0)+1}</td>
                 </tr>"""
             st.markdown(f"""
-            <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+            <div style='overflow-x:auto;border-radius:10px;
+                 border:1px solid var(--seo-border,rgba(148,163,184,.22));margin-top:8px'>
             <table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>
                 <thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'>
                 <tr>
-                    <th style='padding:8px 10px;font-size:.75rem;color:var(--seo-muted,#64748B);text-align:center;width:70px'>Level</th>
-                    <th style='padding:8px 10px;font-size:.75rem;color:var(--seo-muted,#64748B);text-align:left'>Heading Text</th>
-                    <th style='padding:8px 10px;font-size:.75rem;color:var(--seo-muted,#64748B);text-align:center;width:80px'>Position</th>
-                    <th style='padding:8px 10px;font-size:.75rem;color:var(--seo-muted,#64748B);text-align:center;width:90px'>Length</th>
+                    <th style='padding:8px 10px;font-size:.73rem;color:var(--seo-muted,#64748B);
+                         text-align:center'>Level</th>
+                    <th style='padding:8px 10px;font-size:.73rem;color:var(--seo-muted,#64748B);
+                         text-align:left'>Heading Text</th>
+                    <th style='padding:8px 10px;font-size:.73rem;color:var(--seo-muted,#64748B);
+                         text-align:center'>Length</th>
+                    <th style='padding:8px 10px;font-size:.73rem;color:var(--seo-muted,#64748B);
+                         text-align:center'>Order</th>
                 </tr>
                 </thead>
                 <tbody>{rows_html}</tbody>
             </table></div>""", unsafe_allow_html=True)
+            st.caption("Length: 🟢 Good  🟡 <10 chars  🔴 >70 chars or Empty")
+
+    # ── Tab: H1 Across All Audited URLs ───────────────────────────────────
+    with tab_h1s:
+        st.markdown('<div class="section-header">🔑 H1 Comparison Across All URLs</div>',
+                    unsafe_allow_html=True)
+        h1_rows = []
+        for _r in results:
+            _hd  = _r.get("heading_detail", {})
+            _h1  = _hd.get("h1_text","")
+            _cnt = _hd.get("counts",{}).get("h1",0)
+            if _cnt == 0:     _status, _status_clr = "❌ Missing",  "#EF4444"
+            elif _cnt > 1:    _status, _status_clr = f"⚠ {_cnt} H1s","#F59E0B"
+            elif len(_h1)>70: _status, _status_clr = "⚠ Too long",  "#F59E0B"
+            elif len(_h1)<10 and _h1: _status, _status_clr = "⚠ Too short","#F59E0B"
+            else:             _status, _status_clr = "✅ Good",      "#10B981"
+            h1_rows.append({
+                "URL":    _r.get("url","")[-80:],
+                "H1 Text": _h1 or "—",
+                "Length":  len(_h1) if _h1 else 0,
+                "Status":  _status,
+            })
+
+        # Summary counts
+        _missing = sum(1 for row in h1_rows if "Missing" in row["Status"])
+        _multi   = sum(1 for row in h1_rows if "H1s" in row["Status"])
+        _issues  = sum(1 for row in h1_rows if "⚠" in row["Status"] or "❌" in row["Status"])
+        sm1, sm2, sm3 = st.columns(3)
+        for _col, _lbl, _val, _clr in [
+            (sm1, "Missing H1",     _missing, "#EF4444" if _missing else "#10B981"),
+            (sm2, "Multiple H1s",   _multi,   "#F59E0B" if _multi   else "#10B981"),
+            (sm3, "H1 Issues Total",_issues,  "#EF4444" if _issues  else "#10B981"),
+        ]:
+            with _col:
+                st.markdown(f"""
+                <div style='background:var(--seo-card-bg,#fff);
+                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                     border-top:3px solid {_clr};border-radius:10px;
+                     padding:12px;text-align:center;margin-bottom:12px'>
+                    <div style='font-size:1.6rem;font-weight:900;color:{_clr}'>{_val}</div>
+                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B)'>{_lbl}</div>
+                </div>""", unsafe_allow_html=True)
+
+        st.dataframe(pd.DataFrame(h1_rows), use_container_width=True, hide_index=True)
+
+        # Export
+        _h1_csv = "URL,H1 Text,Length,Status\n" + "\n".join(
+            f'"{row["URL"]}","{row["H1 Text"].replace(chr(34),chr(39))}",{row["Length"]},"{row["Status"]}"'
+            for row in h1_rows
+        )
+        st.download_button("⬇️ Download H1 Report CSV", data=_h1_csv,
+                           file_name="h1_report.csv", mime="text/csv", key="h1_csv_export")
 
     # ── Tab: Issues ───────────────────────────────────────────────────────
     with tab_issues:
         hdg_issues = hd.get("issues", [])
         if not hdg_issues:
-            st.success("✅ No heading structure issues found.")
+            st.success("✅ No heading structure issues found for this page.")
         else:
             sev_order = {"Critical":0,"High":1,"Warning":2,"Medium":3,"Low":4}
             for iss in sorted(hdg_issues, key=lambda x: sev_order.get(x.get("severity","Low"),5)):
@@ -3843,13 +3926,13 @@ def page_heading_analysis():
                      border-radius:0 10px 10px 0;padding:12px 16px;margin-bottom:8px;
                      border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
                     <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{sev_c};color:white;padding:2px 10px;border-radius:999px;
+                        <span style='background:{sev_c};color:#fff;padding:2px 10px;border-radius:999px;
                               font-size:.7rem;font-weight:700'>{sev}</span>
                         <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {iss.get("issue","")}</span>
+                            {_esc.escape(iss.get("issue",""))}</span>
                     </div>
-                    <div style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
-                        ✅ {iss.get("recommendation","")}</div>
+                    <div style='font-size:.78rem;color:#1D4ED8;margin-top:4px'>
+                        ✅ {_esc.escape(iss.get("recommendation",""))}</div>
                     <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
                         Impact: {iss.get("impact_score",0)}/10 &nbsp;·&nbsp; Effort: {iss.get("effort","—")}
                     </div>

@@ -3,6 +3,7 @@ heading_auditor.py
 Deep heading structure analysis for SEO Technical Audit Dashboard.
 """
 
+import html as _html
 import re
 from collections import defaultdict
 
@@ -140,7 +141,7 @@ def _build_tree_html(headings):
     for h in headings:
         level = h["level"]
         color = HEADING_COLORS.get(level, "#374151")
-        text = h["text"] if not h["is_empty"] else "(empty)"
+        text = _html.escape(h["text"]) if not h["is_empty"] else "<em>(empty)</em>"
         label = f"H{level}"
 
         skip_marker = ""
@@ -305,7 +306,7 @@ def analyze_heading_structure(soup, title=""):
     counts = _count_headings(headings)
 
     h1_list = [h for h in headings if h["level"] == 1]
-    h1_text = h1_list[0]["text"] if h1_list else ""
+    h1_text = (h1_list[0]["text"] if h1_list and not h1_list[0]["is_empty"] else "")
 
     sequence_violations = _detect_sequence_violations(headings)
     empty_headings = _detect_empty_headings(headings)
