@@ -504,7 +504,9 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
     )
 
     from modules.image_auditor import analyze_images_advanced
-    result["image_detail"] = analyze_images_advanced(soup, base_url=url)
+    result["image_detail"] = analyze_images_advanced(
+        soup, base_url=url, check_sizes=True, max_size_checks=40
+    )
 
     # Capture HTTP headers and page size from the fetch result
     http_headers = fetch.get("http_headers", {})

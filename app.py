@@ -3213,14 +3213,25 @@ def _page_image_seo_body():
     _sz_cache_key = f"img_sizes_{sel}"
     _sz_cache = st.session_state.get(_sz_cache_key, {})
 
-    # Auto-populate from PSI data if available (PSI uses real Chrome so CDN
-    # bot-protection doesn't block it — works for Webflow, Cloudflare, etc.)
+    # Pre-populate cache from audit data (sizes fetched during initial audit)
     if not _sz_cache:
-        _psi_for_url = st.session_state.get(f"psi_live_{urls[sel]}", {})
-        _psi_img_sizes = _psi_for_url.get("image_sizes", {}) if _psi_for_url.get("success") else {}
-        if _psi_img_sizes:
-            st.session_state[_sz_cache_key] = _psi_img_sizes
-            _sz_cache = _psi_img_sizes
+        _audit_sizes = {
+            img["url"]: img["file_size_bytes"]
+            for img in images
+            if img.get("url") and img.get("file_size_bytes") is not None
+        }
+        if _audit_sizes:
+            st.session_state[_sz_cache_key] = _audit_sizes
+            _sz_cache = _audit_sizes
+
+    # Also merge PSI image sizes (PSI uses real Chrome — bypasses CDN bot-protection)
+    _psi_for_url = st.session_state.get(f"psi_live_{urls[sel]}", {})
+    _psi_img_sizes = _psi_for_url.get("image_sizes", {}) if _psi_for_url.get("success") else {}
+    if _psi_img_sizes:
+        _merged = {**_sz_cache, **{k: v for k, v in _psi_img_sizes.items() if v}}
+        if _merged != _sz_cache:
+            st.session_state[_sz_cache_key] = _merged
+            _sz_cache = _merged
 
     _sizes_fetched = bool(_sz_cache)
     _large_count = sum(1 for v in _sz_cache.values() if v is not None and v > 200 * 1024)
@@ -3406,8 +3417,8 @@ def _page_image_seo_body():
                 srcset_b = "<span style='color:#10B981;font-size:.8rem'>✓</span>" if img.get("has_srcset") else "<span style='color:#94A3B8;font-size:.8rem'>—</span>"
                 name_q   = "" if img.get("naming_quality") == "good" else " <span style='color:#F59E0B;font-size:.7rem' title='Poor filename'>⚠</span>"
 
-                # File size — from separate cache, red if > 200KB
-                _sz_bytes = _sz_cache.get(raw_url)
+                # File size — cache first, then audit data fallback
+                _sz_bytes = _sz_cache.get(raw_url) or img.get("file_size_bytes")
                 if _sz_bytes is not None and _sz_bytes > 200 * 1024:
                     size_lbl = f"<b style=\"color:#EF4444\">{_fsl(_sz_bytes)} ⚠</b>"
                 elif _sz_bytes is not None:

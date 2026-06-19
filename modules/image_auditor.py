@@ -294,7 +294,7 @@ def _mark_lcp_candidate(images):
     raster[0]["is_lcp_candidate"] = True
 
 
-def _populate_sizes(images, max_size_checks):
+def _populate_sizes(images, max_size_checks, base_url=""):
     """
     Make HEAD requests for up to max_size_checks unique image URLs
     and populate file_size_bytes / file_size_label.
@@ -302,16 +302,18 @@ def _populate_sizes(images, max_size_checks):
     if not REQUESTS_AVAILABLE:
         return
 
+    from functools import partial
     seen = {}
     to_check = []
     for img in images:
         url = img["url"]
-        if url and url not in seen and len(to_check) < max_size_checks:
+        if url and url.startswith("http") and url not in seen and len(to_check) < max_size_checks:
             to_check.append(url)
             seen[url] = None
 
+    _fetch = partial(_fetch_size, referer=base_url) if base_url else _fetch_size
     with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(_fetch_size, to_check))
+        results = list(executor.map(_fetch, to_check))
 
     size_map = {url: size for url, size in results}
 
@@ -516,7 +518,7 @@ def analyze_images_advanced(soup, base_url="", check_sizes=False, max_size_check
     _mark_lcp_candidate(images)
 
     if check_sizes and images:
-        _populate_sizes(images, max_size_checks)
+        _populate_sizes(images, max_size_checks, base_url=base_url)
 
     summary = _compute_summary(images, check_sizes)
     issues = _build_issues(summary, check_sizes)
