@@ -3155,19 +3155,18 @@ def page_image_seo():
 
     images = im.get("images", [])
 
-    # ── LCP candidate (computed from current images list at render time) ──
+    # ── LCP candidate — SVGs excluded (browser never picks SVG as LCP) ──
     _lcp_url = None
+    _raster = [img for img in images if img.get("format_label") not in ("SVG",)
+               and img.get("url","").startswith("http")]
     _with_dims = [(img, (img.get("width") or 0) * (img.get("height") or 0))
-                  for img in images if img.get("has_dimensions")]
+                  for img in _raster if img.get("has_dimensions")]
     if _with_dims:
         _best_img, _best_area = max(_with_dims, key=lambda x: x[1])
         if _best_area > 0:
             _lcp_url = _best_img["url"]
-    if not _lcp_url:
-        for _img in images:
-            if _img.get("format_label") not in ("SVG",) and _img.get("url","").startswith("http"):
-                _lcp_url = _img["url"]
-                break
+    if not _lcp_url and _raster:
+        _lcp_url = _raster[0]["url"]
 
     # ── Sizes cache: {url: bytes_or_None} stored separately from audit data ─
     _sz_cache_key = f"img_sizes_{sel}"

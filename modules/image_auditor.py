@@ -114,19 +114,47 @@ def _resolve_url(src, base_url):
 
 
 def _fetch_size(url):
-    """HEAD request to get Content-Length. Returns (url, size_bytes or None)."""
+    """
+    Fetch image file size in bytes. Returns (url, size_bytes or None).
+
+    Strategy:
+    1. HEAD request — fast; works when server returns Content-Length.
+    2. Range GET (bytes=0-0) fallback — CDNs that use chunked transfer
+       (e.g. Webflow's cdn.prod.website-files.com) omit Content-Length
+       on HEAD but DO return Content-Range on a range request, which
+       carries the total file size.
+    """
     if not REQUESTS_AVAILABLE:
         return url, None
+    hdrs = {"User-Agent": "Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)"}
     try:
-        resp = requests.head(
-            url,
-            timeout=5,
-            allow_redirects=True,
-            verify=False,
-            headers={"User-Agent": "SEO-Audit-Bot/1.0"},
-        )
+        # ── 1. HEAD ───────────────────────────────────────────────────────
+        resp = requests.head(url, timeout=6, allow_redirects=True,
+                             verify=False, headers=hdrs)
         cl = resp.headers.get("Content-Length")
-        return url, int(cl) if cl and cl.isdigit() else None
+        if cl and cl.isdigit() and int(cl) > 0:
+            return url, int(cl)
+
+        # ── 2. Range GET fallback ─────────────────────────────────────────
+        resp2 = requests.get(
+            url, timeout=6, allow_redirects=True, verify=False,
+            headers={**hdrs, "Range": "bytes=0-0"},
+            stream=True,
+        )
+        resp2.close()
+        # Content-Range: bytes 0-0/TOTAL  →  parse TOTAL
+        cr = resp2.headers.get("Content-Range", "")
+        if "/" in cr:
+            total = cr.split("/")[-1].strip()
+            if total.isdigit() and int(total) > 0:
+                return url, int(total)
+        # Some servers honour the range but still echo Content-Length = 1
+        # (the one byte we requested). If resp2 returned full 200 with CL:
+        cl2 = resp2.headers.get("Content-Length")
+        if resp2.status_code == 200 and cl2 and cl2.isdigit() and int(cl2) > 1:
+            return url, int(cl2)
+
+        return url, None
     except Exception:
         return url, None
 
@@ -223,24 +251,26 @@ def _extract_image_data(soup, base_url):
 def _mark_lcp_candidate(images):
     """
     Mark the image most likely to be the page's LCP element.
-    Prefers the largest by pixel area when dimensions are present;
-    falls back to the first non-SVG external image.
+    SVGs are excluded — browsers never report an SVG as the LCP element.
+    Prefers the largest raster image by pixel area; falls back to the
+    first non-SVG HTTP image.
     """
     if not images:
         return
+    raster = [img for img in images if img.get("format_label") not in ("SVG",)
+              and img.get("url", "").startswith("http")]
+    if not raster:
+        return
     with_dims = [
         (img, (img.get("width") or 0) * (img.get("height") or 0))
-        for img in images if img.get("has_dimensions")
+        for img in raster if img.get("has_dimensions")
     ]
     if with_dims:
         best_img, best_area = max(with_dims, key=lambda x: x[1])
         if best_area > 0:
             best_img["is_lcp_candidate"] = True
             return
-    for img in images:
-        if img.get("format_label") not in ("SVG",) and img.get("url", "").startswith("http"):
-            img["is_lcp_candidate"] = True
-            return
+    raster[0]["is_lcp_candidate"] = True
 
 
 def _populate_sizes(images, max_size_checks):
