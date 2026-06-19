@@ -113,46 +113,67 @@ def _resolve_url(src, base_url):
     return urljoin(base_url, src) if base_url else src
 
 
-def _fetch_size(url):
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+}
+
+
+def _fetch_size(url, referer=None):
     """
     Fetch image file size in bytes. Returns (url, size_bytes or None).
 
     Strategy:
-    1. HEAD request — fast; works when server returns Content-Length.
-    2. Range GET (bytes=0-0) fallback — CDNs that use chunked transfer
-       (e.g. Webflow's cdn.prod.website-files.com) omit Content-Length
-       on HEAD but DO return Content-Range on a range request, which
-       carries the total file size.
+    1. HEAD — fast, no body download.
+    2. Range GET bytes=0-1 — extracts total from Content-Range header.
+    3. Streaming GET — reads only response headers, no body download.
     """
     if not REQUESTS_AVAILABLE:
         return url, None
-    hdrs = {"User-Agent": "Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)"}
+    hdrs = dict(_BROWSER_HEADERS)
+    if referer:
+        hdrs["Referer"] = referer
+
+    def _cl(h):
+        v = h.get("Content-Length") or h.get("x-content-length") or h.get("x-uncompressed-content-length")
+        return int(v) if v and str(v).isdigit() and int(v) > 1 else None
+
     try:
         # ── 1. HEAD ───────────────────────────────────────────────────────
-        resp = requests.head(url, timeout=6, allow_redirects=True,
-                             verify=False, headers=hdrs)
-        cl = resp.headers.get("Content-Length")
-        if cl and cl.isdigit() and int(cl) > 0:
-            return url, int(cl)
+        r = requests.head(url, timeout=10, allow_redirects=True, verify=False, headers=hdrs)
+        if r.status_code < 400:
+            sz = _cl(r.headers)
+            if sz:
+                return url, sz
 
-        # ── 2. Range GET fallback ─────────────────────────────────────────
-        resp2 = requests.get(
-            url, timeout=6, allow_redirects=True, verify=False,
-            headers={**hdrs, "Range": "bytes=0-0"},
-            stream=True,
-        )
-        resp2.close()
-        # Content-Range: bytes 0-0/TOTAL  →  parse TOTAL
-        cr = resp2.headers.get("Content-Range", "")
-        if "/" in cr:
-            total = cr.split("/")[-1].strip()
-            if total.isdigit() and int(total) > 0:
-                return url, int(total)
-        # Some servers honour the range but still echo Content-Length = 1
-        # (the one byte we requested). If resp2 returned full 200 with CL:
-        cl2 = resp2.headers.get("Content-Length")
-        if resp2.status_code == 200 and cl2 and cl2.isdigit() and int(cl2) > 1:
-            return url, int(cl2)
+        # ── 2. Range GET ──────────────────────────────────────────────────
+        r2 = requests.get(url, timeout=10, allow_redirects=True, verify=False,
+                          headers={**hdrs, "Range": "bytes=0-1"}, stream=True)
+        r2.close()
+        if r2.status_code in (200, 206):
+            cr = r2.headers.get("Content-Range", "")
+            if "/" in cr:
+                total = cr.split("/")[-1].strip()
+                if total.isdigit() and int(total) > 1:
+                    return url, int(total)
+            sz = _cl(r2.headers)
+            if sz:
+                return url, sz
+
+        # ── 3. Streaming GET (headers only, no body) ──────────────────────
+        r3 = requests.get(url, timeout=10, allow_redirects=True, verify=False,
+                          headers=hdrs, stream=True)
+        r3.close()
+        if r3.status_code == 200:
+            sz = _cl(r3.headers)
+            if sz:
+                return url, sz
 
         return url, None
     except Exception:

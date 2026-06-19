@@ -119,6 +119,24 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
             })
     opps.sort(key=lambda x: x["score"] or 0)
 
+    # Image sizes — pulled from Lighthouse audits so they work even on CDNs
+    # that block server-side requests (Cloudflare, Webflow, etc.)
+    image_sizes = {}
+    for _audit_key in ("network-requests",):
+        for _item in (audits.get(_audit_key, {}).get("details", {}).get("items", []) or []):
+            _url  = _item.get("url") or ""
+            _size = _item.get("resourceSize") or _item.get("transferSize") or 0
+            _type = (_item.get("resourceType") or "").lower()
+            if _url and _size and _type == "image":
+                image_sizes[_url] = int(_size)
+    for _audit_key in ("uses-optimized-images", "uses-responsive-images",
+                       "modern-image-formats", "efficiently-encode-images"):
+        for _item in (audits.get(_audit_key, {}).get("details", {}).get("items", []) or []):
+            _url  = _item.get("url") or ""
+            _size = _item.get("totalBytes") or 0
+            if _url and _size and _url not in image_sizes:
+                image_sizes[_url] = int(_size)
+
     return {
         "success":             True,
         "source":              "PageSpeed Insights (Lighthouse)",
@@ -134,5 +152,6 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
         "si":   si,
         "ttfb": ttfb,
         "inp":  inp,
-        "opportunities": opps[:10],
+        "opportunities":  opps[:10],
+        "image_sizes":    image_sizes,
     }

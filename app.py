@@ -3212,6 +3212,16 @@ def _page_image_seo_body():
     # ── Sizes cache: {url: bytes_or_None} stored separately from audit data ─
     _sz_cache_key = f"img_sizes_{sel}"
     _sz_cache = st.session_state.get(_sz_cache_key, {})
+
+    # Auto-populate from PSI data if available (PSI uses real Chrome so CDN
+    # bot-protection doesn't block it — works for Webflow, Cloudflare, etc.)
+    if not _sz_cache:
+        _psi_for_url = st.session_state.get(f"psi_live_{urls[sel]}", {})
+        _psi_img_sizes = _psi_for_url.get("image_sizes", {}) if _psi_for_url.get("success") else {}
+        if _psi_img_sizes:
+            st.session_state[_sz_cache_key] = _psi_img_sizes
+            _sz_cache = _psi_img_sizes
+
     _sizes_fetched = bool(_sz_cache)
     _large_count = sum(1 for v in _sz_cache.values() if v is not None and v > 200 * 1024)
 
@@ -3268,27 +3278,36 @@ def _page_image_seo_body():
                              help="Make HEAD requests to measure actual image file sizes"):
                     from modules.image_auditor import _fetch_size
                     from concurrent.futures import ThreadPoolExecutor
-                    _urls = list({img["url"] for img in images
-                                  if img.get("url", "").startswith("http")})[:60]
+                    from functools import partial
+                    _page_url = urls[sel]
+                    _img_urls = list({img["url"] for img in images
+                                      if img.get("url", "").startswith("http")})[:60]
                     _spinner = st.empty()
-                    _spinner.info(f"Checking {len(_urls)} image URLs… please wait")
+                    _spinner.info(f"Checking {len(_img_urls)} image URLs… please wait")
+                    _fetch_with_ref = partial(_fetch_size, referer=_page_url)
                     with ThreadPoolExecutor(max_workers=10) as _exe:
-                        _raw = list(_exe.map(_fetch_size, _urls))
-                    st.session_state[_sz_cache_key] = {u: sz for u, sz in _raw}
+                        _raw = list(_exe.map(_fetch_with_ref, _img_urls))
+                    _new_sizes = {u: sz for u, sz in _raw}
+                    # Merge with existing PSI sizes (PSI wins for CDN-blocked images)
+                    _merged = {**_new_sizes, **{k: v for k, v in _sz_cache.items() if v is not None}}
+                    st.session_state[_sz_cache_key] = _merged
                     _spinner.empty()
                     st.rerun()
             with _stat_col:
                 if _sizes_fetched:
                     _known = sum(1 for v in _sz_cache.values() if v is not None)
+                    _psi_src = bool(st.session_state.get(f"psi_live_{urls[sel]}", {}).get("image_sizes"))
+                    _src_txt = " via PSI" if _psi_src else ""
                     st.markdown(
                         f"<div style='padding:6px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
-                        f"✅ Sizes checked for <b>{_known}</b> of {len(images)} images &nbsp;|&nbsp; "
-                        f"<span style='color:#EF4444;font-weight:700'>{_large_count} images &gt; 200KB</span></div>",
+                        f"✅ Sizes loaded{_src_txt} for <b>{_known}</b> images &nbsp;|&nbsp; "
+                        f"<span style='color:#EF4444;font-weight:700'>{_large_count} &gt; 200KB</span></div>",
                         unsafe_allow_html=True)
                 else:
                     st.markdown(
                         "<div style='padding:6px 0;font-size:.75rem;color:var(--seo-muted,#64748B)'>"
-                        "File sizes not yet checked — click the button to fetch real sizes via HEAD requests.</div>",
+                        "Run <b>Mobile Audit → Fetch Real Scores</b> first for automatic sizes, "
+                        "or click here to check via HEAD requests.</div>",
                         unsafe_allow_html=True)
 
             # Filter controls
