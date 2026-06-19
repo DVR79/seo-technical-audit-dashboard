@@ -42,8 +42,8 @@ EXTENSION_TO_FORMAT = {
 
 SIZE_LABELS = [
     (100 * 1024, "< 100KB"),
-    (300 * 1024, "100–300KB"),
-    (500 * 1024, "300–500KB"),
+    (200 * 1024, "100–200KB"),
+    (500 * 1024, "200–500KB"),
 ]
 
 
@@ -212,11 +212,35 @@ def _extract_image_data(soup, base_url):
             "is_in_picture": is_in_picture,
             "naming_quality": nq,
             "file_size_bytes": None,
-            "file_size_label": "Unknown",
+            "file_size_label": "—",
+            "is_lcp_candidate": False,
             "issues": per_image_issues,
         })
 
     return images
+
+
+def _mark_lcp_candidate(images):
+    """
+    Mark the image most likely to be the page's LCP element.
+    Prefers the largest by pixel area when dimensions are present;
+    falls back to the first non-SVG external image.
+    """
+    if not images:
+        return
+    with_dims = [
+        (img, (img.get("width") or 0) * (img.get("height") or 0))
+        for img in images if img.get("has_dimensions")
+    ]
+    if with_dims:
+        best_img, best_area = max(with_dims, key=lambda x: x[1])
+        if best_area > 0:
+            best_img["is_lcp_candidate"] = True
+            return
+    for img in images:
+        if img.get("format_label") not in ("SVG",) and img.get("url", "").startswith("http"):
+            img["is_lcp_candidate"] = True
+            return
 
 
 def _populate_sizes(images, max_size_checks):
@@ -247,9 +271,9 @@ def _populate_sizes(images, max_size_checks):
             img["file_size_bytes"] = size_bytes
             img["file_size_label"] = _file_size_label(size_bytes)
             # Update large image issue flag
-            if size_bytes is not None and size_bytes > 300 * 1024:
-                if "Large file size (> 300KB)" not in img["issues"]:
-                    img["issues"].append("Large file size (> 300KB)")
+            if size_bytes is not None and size_bytes > 200 * 1024:
+                if "Large file size (> 200KB)" not in img["issues"]:
+                    img["issues"].append("Large file size (> 200KB)")
 
 
 def _compute_summary(images, check_sizes):
@@ -275,7 +299,7 @@ def _compute_summary(images, check_sizes):
     if check_sizes:
         large_images = sum(
             1 for i in images
-            if i["file_size_bytes"] is not None and i["file_size_bytes"] > 300 * 1024
+            if i["file_size_bytes"] is not None and i["file_size_bytes"] > 200 * 1024
         )
 
     format_breakdown = defaultdict(int)
@@ -395,10 +419,10 @@ def _build_issues(summary, check_sizes):
 
     if check_sizes and n["large_images"] > 0:
         issues.append({
-            "issue": f"{n['large_images']} image(s) are larger than 300KB",
+            "issue": f"{n['large_images']} image(s) are larger than 200KB",
             "category": "Performance",
             "severity": "High",
-            "recommendation": "Compress images or switch to a more efficient format to reduce file size.",
+            "recommendation": "Compress images or switch to WebP/AVIF to keep file sizes under 200KB.",
             "impact_score": 8,
             "effort": "Medium",
         })
@@ -438,6 +462,7 @@ def analyze_images_advanced(soup, base_url="", check_sizes=False, max_size_check
         Comprehensive image analysis results.
     """
     images = _extract_image_data(soup, base_url)
+    _mark_lcp_candidate(images)
 
     if check_sizes and images:
         _populate_sizes(images, max_size_checks)

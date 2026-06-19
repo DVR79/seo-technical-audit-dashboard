@@ -3155,6 +3155,28 @@ def page_image_seo():
 
     images = im.get("images", [])
 
+    # ── LCP candidate (computed from current images list at render time) ──
+    _lcp_url = None
+    _with_dims = [(img, (img.get("width") or 0) * (img.get("height") or 0))
+                  for img in images if img.get("has_dimensions")]
+    if _with_dims:
+        _best_img, _best_area = max(_with_dims, key=lambda x: x[1])
+        if _best_area > 0:
+            _lcp_url = _best_img["url"]
+    if not _lcp_url:
+        for _img in images:
+            if _img.get("format_label") not in ("SVG",) and _img.get("url","").startswith("http"):
+                _lcp_url = _img["url"]
+                break
+
+    # ── Sizes-fetched state (persist across reruns) ───────────────────────
+    _sz_key = f"img_sizes_done_{sel}"
+    if not st.session_state.get(_sz_key):
+        if any(img.get("file_size_bytes") is not None for img in images):
+            st.session_state[_sz_key] = True
+    _sizes_fetched = st.session_state.get(_sz_key, False)
+    _large_count = sum(1 for img in images if (img.get("file_size_bytes") or 0) > 200 * 1024)
+
     # ── KPI cards — clickable to filter table ─────────────────────────────
     if "img_filter" not in st.session_state:
         st.session_state["img_filter"] = None
@@ -3175,16 +3197,18 @@ def page_image_seo():
                 st.session_state["img_filter"] = None if st.session_state.get("img_filter") == fkey else fkey
                 st.rerun()
 
-    kc = st.columns(8)
+    kc = st.columns(9)
+    _large_val = _large_count if _sizes_fetched else "—"
     _img_kpis = [
-        (kc[0], "Total",        im.get("total",0),               "#3B82F6", "all"),
-        (kc[1], "Missing Alt",  im.get("missing_alt",0),          "#EF4444", "missing"),
-        (kc[2], "Empty Alt",    im.get("empty_alt",0),            "#F97316", "empty"),
-        (kc[3], "Generic Alt",  im.get("generic_alt",0),          "#F59E0B", "generic"),
-        (kc[4], "No Lazy Load", im.get("no_lazy",0),              "#8B5CF6", "no_lazy"),
-        (kc[5], "No Dimensions",im.get("no_dimensions",0),        "#F97316", "no_dims"),
-        (kc[6], "Non-WebP",     im.get("non_webp_jpg_png",0),     "#06B6D4", "non_webp"),
-        (kc[7], "Bad Naming",   im.get("bad_naming",0),           "#94A3B8", "bad_name"),
+        (kc[0], "Total",         im.get("total",0),               "#3B82F6", "all"),
+        (kc[1], "Missing Alt",   im.get("missing_alt",0),          "#EF4444", "missing"),
+        (kc[2], "Empty Alt",     im.get("empty_alt",0),            "#F97316", "empty"),
+        (kc[3], "Generic Alt",   im.get("generic_alt",0),          "#F59E0B", "generic"),
+        (kc[4], "No Lazy Load",  im.get("no_lazy",0),              "#8B5CF6", "no_lazy"),
+        (kc[5], "No Dimensions", im.get("no_dimensions",0),        "#F97316", "no_dims"),
+        (kc[6], "Non-WebP",      im.get("non_webp_jpg_png",0),     "#06B6D4", "non_webp"),
+        (kc[7], "Bad Naming",    im.get("bad_naming",0),           "#94A3B8", "bad_name"),
+        (kc[8], ">200KB",        _large_val,                       "#EF4444", "large_size"),
     ]
     for col, lbl, val, clr, fkey in _img_kpis:
         _img_kpi_btn(col, lbl, val, clr, fkey)
@@ -3199,6 +3223,30 @@ def page_image_seo():
         if not images:
             st.info("No images found on this page.")
         else:
+            # ── Fetch real file sizes ─────────────────────────────────────────
+            _btn_col, _stat_col = st.columns([2, 5])
+            with _btn_col:
+                if st.button("🔍 Check Real File Sizes", key=f"img_fetch_sz_{sel}",
+                             help="Make HEAD requests to measure actual image file sizes"):
+                    from modules.image_auditor import _populate_sizes
+                    with st.spinner("Fetching image file sizes… this may take a few seconds"):
+                        _populate_sizes(images, max_size_checks=60)
+                    st.session_state[f"img_sizes_done_{sel}"] = True
+                    st.rerun()
+            with _stat_col:
+                if _sizes_fetched:
+                    _known = sum(1 for img in images if img.get("file_size_bytes") is not None)
+                    st.markdown(
+                        f"<div style='padding:6px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
+                        f"✅ Sizes checked for <b>{_known}</b> images &nbsp;|&nbsp; "
+                        f"<span style='color:#EF4444;font-weight:700'>{_large_count} images &gt; 200KB</span></div>",
+                        unsafe_allow_html=True)
+                else:
+                    st.markdown(
+                        "<div style='padding:6px 0;font-size:.75rem;color:var(--seo-muted,#64748B)'>"
+                        "File sizes not yet checked — click the button to fetch real sizes via HEAD requests.</div>",
+                        unsafe_allow_html=True)
+
             # Filter controls
             fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 3])
             with fc1:
@@ -3216,14 +3264,15 @@ def page_image_seo():
             # Apply active KPI card filter first
             active_card = st.session_state.get("img_filter")
             card_filter_map = {
-                "all":      lambda i: True,
-                "missing":  lambda i: i.get("alt_status") == "missing",
-                "empty":    lambda i: i.get("alt_status") == "empty",
-                "generic":  lambda i: i.get("alt_status") == "generic",
-                "no_lazy":  lambda i: not i.get("has_lazy"),
-                "no_dims":  lambda i: not i.get("has_dimensions"),
-                "non_webp": lambda i: i.get("extension","") in ("jpg","jpeg","png"),
-                "bad_name": lambda i: i.get("naming_quality") == "bad",
+                "all":        lambda i: True,
+                "missing":    lambda i: i.get("alt_status") == "missing",
+                "empty":      lambda i: i.get("alt_status") == "empty",
+                "generic":    lambda i: i.get("alt_status") == "generic",
+                "no_lazy":    lambda i: not i.get("has_lazy"),
+                "no_dims":    lambda i: not i.get("has_dimensions"),
+                "non_webp":   lambda i: i.get("extension","") in ("jpg","jpeg","png"),
+                "bad_name":   lambda i: i.get("naming_quality") == "bad",
+                "large_size": lambda i: (i.get("file_size_bytes") or 0) > 200 * 1024,
             }
             filtered = [i for i in images if card_filter_map.get(active_card, lambda x: True)(i)] if active_card else images
 
@@ -3292,7 +3341,22 @@ def page_image_seo():
                 dims_val = f'{img.get("width")}×{img.get("height")}' if img.get("has_dimensions") else "<span style='color:#94A3B8'>—</span>"
                 srcset_b = "<span style='color:#10B981;font-size:.8rem'>✓</span>" if img.get("has_srcset") else "<span style='color:#94A3B8;font-size:.8rem'>—</span>"
                 name_q   = "" if img.get("naming_quality") == "good" else " <span style='color:#F59E0B;font-size:.7rem' title='Poor filename'>⚠</span>"
-                size_lbl = img.get("file_size_label","—")
+
+                # File size — red if > 200KB
+                _sz_bytes = img.get("file_size_bytes")
+                _sz_raw   = img.get("file_size_label","—")
+                if _sz_bytes is not None and _sz_bytes > 200 * 1024:
+                    size_lbl = f"<span style='color:#EF4444;font-weight:700'>{_sz_raw} ⚠</span>"
+                elif _sz_bytes is not None:
+                    size_lbl = f"<span style='color:#10B981;font-weight:600'>{_sz_raw}</span>"
+                else:
+                    size_lbl = "<span style='color:var(--seo-muted,#64748B)'>—</span>"
+
+                # LCP candidate badge
+                _is_lcp = (raw_url and raw_url == _lcp_url)
+                lcp_badge = ("<span style='background:#7C3AED;color:#fff;padding:2px 7px;border-radius:4px;"
+                             "font-size:.65rem;font-weight:700;margin-left:4px' title='Likely LCP element'>⚡ LCP</span>"
+                             if _is_lcp else "")
 
                 # Thumbnail: only render for non-SVG/non-CDN-hashed URLs
                 if raw_url and fmt not in ("SVG",) and raw_url.startswith("http"):
@@ -3300,15 +3364,19 @@ def page_image_seo():
                 else:
                     thumb = f"<span style='display:inline-block;width:36px;height:36px;background:#F1F5F9;border-radius:4px;text-align:center;line-height:36px;font-size:.65rem;color:#94A3B8'>{fmt[:3]}</span>"
 
+                _row_bg = "background:rgba(124,58,237,.06)" if _is_lcp else ""
                 rows_html += f"""
-                <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.12))'>
+                <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.12));{_row_bg}'>
                     <td style='padding:6px 8px;text-align:center;width:44px'>{thumb}</td>
                     <td style='padding:6px 8px;max-width:220px'>
-                        <a href='{raw_url}' target='_blank' style='font-size:.73rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none;word-break:break-all' title='{raw_url}'>{url_label}</a>
+                        <div style='display:flex;align-items:center;flex-wrap:wrap;gap:3px'>
+                            <a href='{raw_url}' target='_blank' style='font-size:.73rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none;word-break:break-all' title='{raw_url}'>{url_label}</a>
+                            {lcp_badge}
+                        </div>
                         <div style='font-size:.67rem;color:var(--seo-muted,#64748B);margin-top:1px'>{disp_name}{name_q}</div>
                     </td>
                     <td style='padding:6px 8px;text-align:center'>{fmt_b}</td>
-                    <td style='padding:6px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>{size_lbl}</td>
+                    <td style='padding:6px 8px;font-size:.72rem;text-align:center'>{size_lbl}</td>
                     <td style='padding:6px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:center'>{dims_val}</td>
                     <td style='padding:6px 8px;max-width:200px'>
                         {alt_b}
@@ -3335,6 +3403,36 @@ def page_image_seo():
                 </thead>
                 <tbody>{rows_html}</tbody>
             </table></div>""", unsafe_allow_html=True)
+
+            # ── LCP recommendation card ───────────────────────────────────
+            if _lcp_url:
+                _lcp_name = _lcp_url.split("/")[-1][:60] or _lcp_url[-60:]
+                _preload_snip = f'&lt;link rel="preload" as="image" href="{_lcp_url}" fetchpriority="high"&gt;'
+                st.markdown(f"""
+                <div style='margin-top:16px;background:var(--seo-card-bg,#fff);
+                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                     border-left:5px solid #7C3AED;border-radius:0 10px 10px 0;padding:14px 16px'>
+                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>
+                        <span style='background:#7C3AED;color:#fff;padding:3px 10px;border-radius:999px;
+                              font-size:.72rem;font-weight:700'>⚡ LCP Candidate</span>
+                        <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
+                            Largest Contentful Paint Optimisation</span>
+                    </div>
+                    <div style='font-size:.8rem;color:var(--seo-text,#374151);margin-bottom:10px'>
+                        The image highlighted in <b style='color:#7C3AED'>purple</b> is likely the LCP element on this page.
+                        Add a <code>&lt;link rel="preload"&gt;</code> in your <code>&lt;head&gt;</code> to instruct the browser
+                        to fetch it early, improving LCP score.
+                    </div>
+                    <div style='background:var(--seo-code-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                         border-radius:6px;padding:10px 14px;font-family:monospace;font-size:.75rem;
+                         color:var(--seo-text,#374151);overflow-x:auto;white-space:nowrap'>
+                        {_preload_snip}
+                    </div>
+                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:8px'>
+                        📌 Image: <span style='color:var(--seo-info-text,#1D4ED8)'>{_lcp_name}</span>
+                        &nbsp;|&nbsp; Add <code>fetchpriority="high"</code> to the <code>&lt;img&gt;</code> tag too.
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
     # ── Tab: Format Analysis ─────────────────────────────────────────────
     with tab_fmt:
