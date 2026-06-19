@@ -735,6 +735,27 @@ body[data-theme="dark"],
 [data-testid="stSpinner"] p { color: var(--seo-muted) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
+   DASHBOARD NAV BUTTONS — "View →" below KPI / health tiles
+   ══════════════════════════════════════════════════════════════════════ */
+[data-testid="stButton"] button[kind="secondary"][id*="nav_"] {
+    background: transparent !important;
+    border: none !important;
+    border-top: 1px solid var(--seo-border) !important;
+    border-radius: 0 0 10px 10px !important;
+    color: var(--seo-accent) !important;
+    font-size: .72rem !important;
+    font-weight: 600 !important;
+    padding: 4px 0 !important;
+    margin-top: -2px !important;
+    letter-spacing: .04em;
+    transition: color .15s ease, background .15s ease;
+}
+[data-testid="stButton"] button[kind="secondary"][id*="nav_"]:hover {
+    background: var(--seo-accent-light) !important;
+    color: var(--seo-accent) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    LINK TABLE KPI BUTTON (Link Analysis)
    ══════════════════════════════════════════════════════════════════════ */
 [data-testid="stButton"] button[kind="secondary"][id*="la_btn_"] {

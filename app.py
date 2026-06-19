@@ -57,6 +57,8 @@ for key, default in [
     ("selected_url_idx", 0),
     ("single_result", None),
     ("dup_report", None),
+    ("nav_page", None),
+    ("nav_filter", None),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -110,12 +112,18 @@ def _sev_bg(sev):
         "Low":      "var(--sev-low-bg,rgba(59,130,246,.10))",
     }.get(sev, "var(--sev-other-bg,rgba(107,114,128,.08))")
 
-def metric_card(label, value, color="#3B82F6"):
+def metric_card(label, value, color="#3B82F6", nav_target=None, nav_filter=None):
     st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card" style="{'cursor:pointer;' if nav_target else ''}">
             <div class="metric-value" style="color:{color}">{value}</div>
             <div class="metric-label">{label}</div>
         </div>""", unsafe_allow_html=True)
+    if nav_target:
+        _key = f"nav_{label.replace(' ','_').lower()}_{nav_target[:6]}"
+        if st.button("View →", key=_key, use_container_width=True, help=f"Go to {nav_target}"):
+            st.session_state["nav_page"]   = nav_target
+            st.session_state["nav_filter"] = nav_filter
+            st.rerun()
 
 
 # ── Ahrefs-style link table ────────────────────────────────────────────────
@@ -1114,14 +1122,14 @@ def page_dashboard():
     st.markdown('<div class="section-header">📊 Overview</div>', unsafe_allow_html=True)
     r1 = st.columns(4)
     r2 = st.columns(4)
-    with r1[0]: metric_card("Total URLs",       total,              "#3B82F6")
-    with r1[1]: metric_card("Healthy URLs",     healthy,            "#10B981")
-    with r1[2]: metric_card("Critical URLs",    crit_u,             "#EF4444")
-    with r1[3]: metric_card("Avg SEO Score",    f"{avg_sc}/100",    _score_color(avg_sc))
-    with r2[0]: metric_card("Critical Issues",  crit_iss,           "#EF4444")
-    with r2[1]: metric_card("Broken Links",     broken_lnk,         "#F97316")
-    with r2[2]: metric_card("No Viewport",      no_viewport,        "#8B5CF6")
-    with r2[3]: metric_card("No Schema",        no_schema,          "#06B6D4")
+    with r1[0]: metric_card("Total URLs",      total,           "#3B82F6", "📋 Audit Results",  None)
+    with r1[1]: metric_card("Healthy URLs",    healthy,         "#10B981", "📋 Audit Results",  "healthy_urls")
+    with r1[2]: metric_card("Critical URLs",   crit_u,          "#EF4444", "📋 Audit Results",  "critical_urls")
+    with r1[3]: metric_card("Avg SEO Score",   f"{avg_sc}/100", _score_color(avg_sc), "📋 Audit Results", None)
+    with r2[0]: metric_card("Critical Issues", crit_iss,        "#EF4444", "📋 Audit Results",  "critical_issues")
+    with r2[1]: metric_card("Broken Links",    broken_lnk,      "#F97316", "🔗 Link Analysis",  "broken_links")
+    with r2[2]: metric_card("No Viewport",     no_viewport,     "#8B5CF6", "📋 Audit Results",  "no_viewport")
+    with r2[3]: metric_card("No Schema",       no_schema,       "#06B6D4", "📋 Audit Results",  "no_schema")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1144,6 +1152,10 @@ def page_dashboard():
                 <div style='font-size:.75rem;font-weight:700;color:#EF4444;margin-top:2px'>ERRORS</div>
                 <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Critical issues</div>
             </div>""", unsafe_allow_html=True)
+            if st.button("View Errors →", key="nav_errs", use_container_width=True, help="View all Critical issues"):
+                st.session_state["nav_page"] = "📋 Audit Results"
+                st.session_state["nav_filter"] = "critical_issues"
+                st.rerun()
         with e2:
             st.markdown(f"""
             <div style='background:var(--sev-high-bg,rgba(249,115,22,.10));border-radius:10px;
@@ -1152,6 +1164,10 @@ def page_dashboard():
                 <div style='font-size:.75rem;font-weight:700;color:#F97316;margin-top:2px'>HIGH</div>
                 <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>High priority</div>
             </div>""", unsafe_allow_html=True)
+            if st.button("View High →", key="nav_high", use_container_width=True, help="View High priority issues"):
+                st.session_state["nav_page"] = "📋 Audit Results"
+                st.session_state["nav_filter"] = "high_issues"
+                st.rerun()
         with e3:
             st.markdown(f"""
             <div style='background:var(--sev-warning-bg,rgba(245,158,11,.10));border-radius:10px;
@@ -1160,6 +1176,10 @@ def page_dashboard():
                 <div style='font-size:.75rem;font-weight:700;color:#F59E0B;margin-top:2px'>WARNINGS</div>
                 <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Medium priority</div>
             </div>""", unsafe_allow_html=True)
+            if st.button("View Warnings →", key="nav_warn", use_container_width=True, help="View Warning issues"):
+                st.session_state["nav_page"] = "📋 Audit Results"
+                st.session_state["nav_filter"] = "warnings"
+                st.rerun()
         with e4:
             st.markdown(f"""
             <div style='background:var(--sev-low-bg,rgba(59,130,246,.10));border-radius:10px;
@@ -1168,6 +1188,10 @@ def page_dashboard():
                 <div style='font-size:.75rem;font-weight:700;color:#3B82F6;margin-top:2px'>NOTICES</div>
                 <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Low priority</div>
             </div>""", unsafe_allow_html=True)
+            if st.button("View Notices →", key="nav_not", use_container_width=True, help="View Low priority notices"):
+                st.session_state["nav_page"] = "📋 Audit Results"
+                st.session_state["nav_filter"] = "notices"
+                st.rerun()
 
     with hp2:
         st.markdown('<div class="section-header">📊 Health Score</div>', unsafe_allow_html=True)
@@ -1210,13 +1234,13 @@ def page_dashboard():
     st.markdown('<div class="section-header">🕷️ Crawlability & Indexability</div>', unsafe_allow_html=True)
     cr1, cr2, cr3, cr4, cr5 = st.columns(5)
     _cw_items = [
-        (cr1, "✅ Indexable",    idx_count,  "#10B981"),
-        (cr2, "🚫 Noindex",      noindex_c,  "#EF4444"),
-        (cr3, "↪️ Has Redirect",  redirect_c, "#F97316"),
-        (cr4, "📋 Has Schema",   schema_c,   "#3B82F6"),
-        (cr5, "📄 AMP Pages",    amp_c,      "#8B5CF6"),
+        (cr1, "✅ Indexable",    idx_count,  "#10B981", None),
+        (cr2, "🚫 Noindex",      noindex_c,  "#EF4444", "noindex"),
+        (cr3, "↪️ Has Redirect",  redirect_c, "#F97316", "has_redirect"),
+        (cr4, "📋 Has Schema",   schema_c,   "#3B82F6", None),
+        (cr5, "📄 AMP Pages",    amp_c,      "#8B5CF6", None),
     ]
-    for col, lbl, cnt, clr in _cw_items:
+    for col, lbl, cnt, clr, flt in _cw_items:
         with col:
             st.markdown(f"""
             <div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));
@@ -1224,6 +1248,11 @@ def page_dashboard():
                 <div style='font-size:1.5rem;font-weight:800;color:{clr}'>{cnt}</div>
                 <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:2px'>{lbl}</div>
             </div>""", unsafe_allow_html=True)
+            _cw_key = f"nav_cw_{lbl[:5].strip().replace(' ','_')}"
+            if st.button("View →", key=_cw_key, use_container_width=True, help=f"View {lbl} URLs"):
+                st.session_state["nav_page"]   = "📋 Audit Results"
+                st.session_state["nav_filter"] = flt
+                st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1540,15 +1569,57 @@ def page_results():
 
     df = build_results_df(results)
 
-    with st.expander("🔽 Filters", expanded=False):
+    # ── Apply nav_filter pre-set from dashboard cards ──────────────────────
+    _nf = st.session_state.get("nav_filter")
+    _score_default  = 0
+    _sev_default    = "Any"
+    _broken_default = False
+    if _nf == "healthy_urls":    _score_default = 75
+    elif _nf == "critical_urls": _score_default = 0;   _sev_default = "Any"   # handled below
+    elif _nf in ("critical_issues",): _sev_default = "Critical"
+    elif _nf == "high_issues":   _sev_default = "High"
+    elif _nf in ("warnings","notices"): _sev_default = "Medium" if _nf == "warnings" else "Any"
+    elif _nf == "broken_links":  _broken_default = True
+    if _nf:
+        _label_map = {
+            "healthy_urls":    "✅ Showing Healthy URLs (score ≥ 75)",
+            "critical_urls":   "🔴 Showing Critical URLs (score < 50)",
+            "critical_issues": "🔴 Showing URLs with Critical Issues",
+            "high_issues":     "🟠 Showing URLs with High Priority Issues",
+            "warnings":        "🟡 Showing URLs with Warnings",
+            "notices":         "🔵 Showing URLs with Notices",
+            "broken_links":    "🔗 Showing URLs with Broken Links",
+            "no_viewport":     "📱 Showing URLs Missing Viewport",
+            "no_schema":       "🔬 Showing URLs Without Schema",
+            "noindex":         "🚫 Showing Noindex URLs",
+            "has_redirect":    "↪️ Showing URLs with Redirects",
+        }
+        st.info(_label_map.get(_nf, f"Filter: {_nf}") + "  ·  [Clear filter](#)", unsafe_allow_html=False)
+        col_clr, _ = st.columns([1, 5])
+        if col_clr.button("✕ Clear Filter", key="clr_nav_filter"):
+            st.session_state["nav_filter"] = None
+            st.rerun()
+        st.session_state["nav_filter"] = None   # consume once
+
+    with st.expander("🔽 Filters", expanded=bool(_nf)):
         fc1,fc2,fc3,fc4 = st.columns(4)
         with fc1: type_filter = st.multiselect("Page Type", df["Type"].unique().tolist(),
                                                 default=df["Type"].unique().tolist())
-        with fc2: score_min = st.slider("Min SEO Score", 0, 100, 0)
-        with fc3: sev_filter = st.selectbox("Has Severity", ["Any","Critical","High","Medium"])
-        with fc4: broken_only = st.checkbox("Has Broken Links")
+        with fc2: score_min = st.slider("Min SEO Score", 0, 100, _score_default)
+        with fc3: sev_filter = st.selectbox("Has Severity", ["Any","Critical","High","Medium"],
+                                             index=["Any","Critical","High","Medium"].index(_sev_default)
+                                             if _sev_default in ["Any","Critical","High","Medium"] else 0)
+        with fc4: broken_only = st.checkbox("Has Broken Links", value=_broken_default)
 
     mask = df["Type"].isin(type_filter) & (df["SEO Score"] >= score_min)
+    if _nf == "critical_urls":
+        mask &= df["SEO Score"] < 50
+    elif _nf == "no_viewport":
+        mask &= df["Viewport"] == False
+    elif _nf == "no_schema":
+        mask &= df["Schema"] == False
+    elif _nf == "noindex":
+        mask &= df["Indexable"] == False
     if sev_filter != "Any" and sev_filter in df.columns:
         mask &= df[sev_filter] > 0
     if broken_only:
@@ -4130,9 +4201,15 @@ with st.sidebar:
         "⚙️ Settings",
     ], label_visibility="collapsed")
 
+    # Legacy URL Detail routing
     if "page" in st.session_state and st.session_state.page == "URL Detail":
         page = "🔎 URL Detail"
         del st.session_state["page"]
+
+    # Programmatic navigation from dashboard/card buttons
+    if st.session_state.get("nav_page"):
+        page = st.session_state["nav_page"]
+        st.session_state["nav_page"] = None
 
     results = st.session_state.audit_results
     if results:
