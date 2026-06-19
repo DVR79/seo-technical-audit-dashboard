@@ -2730,6 +2730,30 @@ def _pick_url(results):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# Performance Audit  (Mobile · Image SEO · Core Web Vitals — unified)
+# ════════════════════════════════════════════════════════════════════════════
+
+def page_performance():
+    st.markdown(
+        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
+        "⚡ Performance Audit</h2>",
+        unsafe_allow_html=True,
+    )
+    tab_mobile, tab_image, tab_cwv = st.tabs([
+        "📱 Mobile Audit",
+        "🖼️ Image SEO",
+        "⚡ Core Web Vitals",
+    ])
+    with tab_mobile:
+        _page_mobile_audit_body()
+    with tab_image:
+        _page_image_seo_body()
+    with tab_cwv:
+        _page_cwv_body()
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # Mobile Audit Page
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -2738,6 +2762,9 @@ def page_mobile_audit():
         "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📱 Mobile SEO Audit</h2>",
         unsafe_allow_html=True,
     )
+    _page_mobile_audit_body()
+
+def _page_mobile_audit_body():
     results = st.session_state.audit_results
     if not results:
         _no_data_info(); return
@@ -3118,6 +3145,9 @@ def page_image_seo():
         "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🖼️ Image SEO Audit</h2>",
         unsafe_allow_html=True,
     )
+    _page_image_seo_body()
+
+def _page_image_seo_body():
     results = st.session_state.audit_results
     if not results:
         _no_data_info(); return
@@ -3769,13 +3799,15 @@ def page_heading_analysis():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_cwv():
-    from modules.cwv_auditor import fetch_psi, parse_psi, THRESHOLDS, _color, _rating
-
     st.markdown(
         "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
         "⚡ Core Web Vitals</h2>",
         unsafe_allow_html=True,
     )
+    _page_cwv_body()
+
+def _page_cwv_body():
+    from modules.cwv_auditor import fetch_psi, parse_psi, THRESHOLDS, _color, _rating
 
     results = st.session_state.audit_results
     if not results:
@@ -4242,9 +4274,7 @@ with st.sidebar:
         "📋 Audit Results",
         "🔎 URL Detail",
         "🔗 Link Analysis",
-        "📱 Mobile Audit",
-        "🖼️ Image SEO",
-        "⚡ Core Web Vitals",
+        "⚡ Performance Audit",
         "📝 Heading Analysis",
         "📤 Export Reports",
         "⚙️ Settings",
@@ -4285,9 +4315,7 @@ elif page == "🚀 New Audit":          page_new_audit()
 elif page == "📋 Audit Results":      page_results()
 elif page == "🔎 URL Detail":         page_url_detail()
 elif page == "🔗 Link Analysis":      page_link_analysis()
-elif page == "📱 Mobile Audit":       page_mobile_audit()
-elif page == "🖼️ Image SEO":          page_image_seo()
-elif page == "⚡ Core Web Vitals":    page_cwv()
+elif page == "⚡ Performance Audit":  page_performance()
 elif page == "📝 Heading Analysis":   page_heading_analysis()
 elif page == "📤 Export Reports":     page_export()
 elif page == "⚙️ Settings":           page_settings()
