@@ -3917,26 +3917,52 @@ def page_heading_analysis():
             st.success("✅ No heading structure issues found for this page.")
         else:
             sev_order = {"Critical":0,"High":1,"Warning":2,"Medium":3,"Low":4}
-            for iss in sorted(hdg_issues, key=lambda x: sev_order.get(x.get("severity","Low"),5)):
+            sev_icon  = {"Critical":"🔴","High":"🟠","Warning":"🟡","Medium":"🟡","Low":"🔵"}
+            sev_c_map = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
+                         "Medium":"#EAB308","Low":"#3B82F6"}
+            sorted_issues = sorted(hdg_issues, key=lambda x: sev_order.get(x.get("severity","Low"),5))
+
+            # Summary counts row
+            _sev_counts = {}
+            for _i in sorted_issues:
+                _s = _i.get("severity","Low")
+                _sev_counts[_s] = _sev_counts.get(_s, 0) + 1
+            _sc_cols = st.columns(len(_sev_counts) or 1)
+            for _ci, (_sv, _cnt) in enumerate(sorted(_sev_counts.items(), key=lambda x: sev_order.get(x[0],5))):
+                with _sc_cols[_ci]:
+                    _cc = sev_c_map.get(_sv,"#6B7280")
+                    st.markdown(f"""
+                    <div style='background:var(--seo-card-bg,#fff);
+                         border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                         border-top:3px solid {_cc};border-radius:8px;
+                         padding:10px;text-align:center;margin-bottom:12px'>
+                        <div style='font-size:1.4rem;font-weight:900;color:{_cc}'>{_cnt}</div>
+                        <div style='font-size:.7rem;color:var(--seo-muted,#64748B)'>{_sv}</div>
+                    </div>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Accordion — one expander per issue
+            for idx, iss in enumerate(sorted_issues):
                 sev   = iss.get("severity","Low")
-                sev_c = {"Critical":"#EF4444","High":"#F97316","Warning":"#F59E0B",
-                          "Medium":"#EAB308","Low":"#3B82F6"}.get(sev,"#6B7280")
-                st.markdown(f"""
-                <div style='background:var(--seo-card-bg,#fff);border-left:5px solid {sev_c};
-                     border-radius:0 10px 10px 0;padding:12px 16px;margin-bottom:8px;
-                     border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
-                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{sev_c};color:#fff;padding:2px 10px;border-radius:999px;
-                              font-size:.7rem;font-weight:700'>{sev}</span>
-                        <span style='font-weight:700;font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {_esc.escape(iss.get("issue",""))}</span>
-                    </div>
-                    <div style='font-size:.78rem;color:#1D4ED8;margin-top:4px'>
-                        ✅ {_esc.escape(iss.get("recommendation",""))}</div>
-                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:3px'>
-                        Impact: {iss.get("impact_score",0)}/10 &nbsp;·&nbsp; Effort: {iss.get("effort","—")}
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                sev_c = sev_c_map.get(sev,"#6B7280")
+                icon  = sev_icon.get(sev,"⚪")
+                label = f"{icon} **{sev}** — {_esc.escape(iss.get('issue',''))}"
+                with st.expander(label, expanded=False):
+                    st.markdown(f"""
+                    <div style='border-left:4px solid {sev_c};padding:8px 14px;border-radius:0 6px 6px 0;
+                         background:var(--seo-card-bg,#fff)'>
+                        <div style='font-size:.82rem;color:#1D4ED8;margin-bottom:6px'>
+                            ✅ <b>Fix:</b> {_esc.escape(iss.get("recommendation",""))}
+                        </div>
+                        <div style='font-size:.75rem;color:var(--seo-muted,#64748B)'>
+                            📈 Impact: <b>{iss.get("impact_score",0)}/10</b>
+                            &nbsp;·&nbsp;
+                            🔧 Effort: <b>{iss.get("effort","—")}</b>
+                            &nbsp;·&nbsp;
+                            📂 Category: <b>{iss.get("category","—")}</b>
+                        </div>
+                    </div>""", unsafe_allow_html=True)
 
 
 def _page_cwv_body():
