@@ -337,7 +337,7 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         <tbody>{rows_html}</tbody>
     </table>
     </div>"""
-    st.markdown(table_html, unsafe_allow_html=True)
+    st.html(table_html)
 
 
 def extract_urls_from_csv_xlsx(uploaded_file):
@@ -945,7 +945,7 @@ def render_inline_result(r):
                         f"word-break:break-all'>{val}</td></tr>"
                     )
 
-            st.markdown(
+            st.html(
                 f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>"
                 f"<table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>"
                 f"<thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'><tr>"
@@ -956,8 +956,7 @@ def render_inline_result(r):
                 f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:var(--seo-muted,#94A3B8);"
                 f"background:var(--seo-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
                 f"{other_rows}"
-                f"</tbody></table></div>",
-                unsafe_allow_html=True,
+                f"</tbody></table></div>"
             )
         else:
             st.info("No HTTP headers captured. Re-run the audit to collect headers.")
@@ -1670,7 +1669,8 @@ def page_results():
 
     styled = (df_f.style
               .map(color_score, subset=["SEO Score"])
-              .map(color_red, subset=["Critical","Broken Int.","Broken Ext."]))
+              .map(color_red, subset=["Critical","Broken Int.","Broken Ext."])
+              .format({"SEO Score": "{:.1f}"}))
     st.dataframe(styled, use_container_width=True, height=450)
 
     st.markdown("---")
@@ -1956,7 +1956,7 @@ def page_url_detail():
                 f"word-break:break-all'>{rv}</td></tr>"
                 for rk, rv in _raw_h.items() if rk.lower() not in shown
             )
-            st.markdown(
+            st.html(
                 f"<div style='overflow-x:auto;border-radius:8px;border:1px solid var(--seo-border,rgba(148,163,184,.22))'>"
                 f"<table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>"
                 f"<thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'><tr>"
@@ -1965,8 +1965,7 @@ def page_url_detail():
                 f"</tr></thead><tbody>{crit_html}"
                 f"<tr><td colspan='2' style='padding:4px 10px;font-size:.7rem;color:var(--seo-muted,#94A3B8);"
                 f"background:var(--seo-card-bg,#F8FAFC)'>— Other headers —</td></tr>"
-                f"{other_html}</tbody></table></div>",
-                unsafe_allow_html=True,
+                f"{other_html}</tbody></table></div>"
             )
         else:
             st.info("No HTTP headers captured. Re-run the audit to collect headers.")
@@ -3621,7 +3620,7 @@ def _page_image_seo_body():
                     <td style='padding:6px 8px;text-align:center'>{srcset_b}</td>
                 </tr>"""
 
-            st.markdown(f"""
+            st.html(f"""
             <div style='overflow-x:auto;border-radius:10px;border:1px solid var(--seo-border,rgba(148,163,184,.22));margin-top:8px'>
             <table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>
                 <thead style='background:var(--table-header-bg,rgba(241,245,249,.9))'>
@@ -3637,7 +3636,7 @@ def _page_image_seo_body():
                 </tr>
                 </thead>
                 <tbody>{rows_html}</tbody>
-            </table></div>""", unsafe_allow_html=True)
+            </table></div>""")
 
             # ── LCP recommendation card ───────────────────────────────────
             if _lcp_url:
@@ -3963,7 +3962,7 @@ def page_heading_analysis():
                     <td style='padding:8px 10px;text-align:center;font-size:.72rem;
                          color:var(--seo-muted,#64748B)'>#{h.get("position",0)+1}</td>
                 </tr>"""
-            st.markdown(f"""
+            st.html(f"""
             <div style='overflow-x:auto;border-radius:10px;
                  border:1px solid var(--seo-border,rgba(148,163,184,.22));margin-top:8px'>
             <table style='width:100%;border-collapse:collapse;background:var(--seo-card-bg,#fff)'>
@@ -3980,7 +3979,7 @@ def page_heading_analysis():
                 </tr>
                 </thead>
                 <tbody>{rows_html}</tbody>
-            </table></div>""", unsafe_allow_html=True)
+            </table></div>""")
             st.caption("Length: 🟢 Good  🟡 <10 chars  🔴 >70 chars or Empty")
 
     # ── Tab: H1 Across All Audited URLs ───────────────────────────────────
