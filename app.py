@@ -3169,13 +3169,11 @@ def page_image_seo():
                 _lcp_url = _img["url"]
                 break
 
-    # ── Sizes-fetched state (persist across reruns) ───────────────────────
-    _sz_key = f"img_sizes_done_{sel}"
-    if not st.session_state.get(_sz_key):
-        if any(img.get("file_size_bytes") is not None for img in images):
-            st.session_state[_sz_key] = True
-    _sizes_fetched = st.session_state.get(_sz_key, False)
-    _large_count = sum(1 for img in images if (img.get("file_size_bytes") or 0) > 200 * 1024)
+    # ── Sizes cache: {url: bytes_or_None} stored separately from audit data ─
+    _sz_cache_key = f"img_sizes_{sel}"
+    _sz_cache = st.session_state.get(_sz_cache_key, {})
+    _sizes_fetched = bool(_sz_cache)
+    _large_count = sum(1 for v in _sz_cache.values() if v is not None and v > 200 * 1024)
 
     # ── KPI cards — clickable to filter table ─────────────────────────────
     if "img_filter" not in st.session_state:
@@ -3228,17 +3226,23 @@ def page_image_seo():
             with _btn_col:
                 if st.button("🔍 Check Real File Sizes", key=f"img_fetch_sz_{sel}",
                              help="Make HEAD requests to measure actual image file sizes"):
-                    from modules.image_auditor import _populate_sizes
-                    with st.spinner("Fetching image file sizes… this may take a few seconds"):
-                        _populate_sizes(images, max_size_checks=60)
-                    st.session_state[f"img_sizes_done_{sel}"] = True
+                    from modules.image_auditor import _fetch_size
+                    from concurrent.futures import ThreadPoolExecutor
+                    _urls = list({img["url"] for img in images
+                                  if img.get("url", "").startswith("http")})[:60]
+                    _spinner = st.empty()
+                    _spinner.info(f"Checking {len(_urls)} image URLs… please wait")
+                    with ThreadPoolExecutor(max_workers=10) as _exe:
+                        _raw = list(_exe.map(_fetch_size, _urls))
+                    st.session_state[_sz_cache_key] = {u: sz for u, sz in _raw}
+                    _spinner.empty()
                     st.rerun()
             with _stat_col:
                 if _sizes_fetched:
-                    _known = sum(1 for img in images if img.get("file_size_bytes") is not None)
+                    _known = sum(1 for v in _sz_cache.values() if v is not None)
                     st.markdown(
                         f"<div style='padding:6px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
-                        f"✅ Sizes checked for <b>{_known}</b> images &nbsp;|&nbsp; "
+                        f"✅ Sizes checked for <b>{_known}</b> of {len(images)} images &nbsp;|&nbsp; "
                         f"<span style='color:#EF4444;font-weight:700'>{_large_count} images &gt; 200KB</span></div>",
                         unsafe_allow_html=True)
                 else:
@@ -3320,6 +3324,7 @@ def page_image_seo():
                 "Unknown": ("<span style='background:#F1F5F9;color:#475569;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700'>?</span>"),
             }
 
+            from modules.image_auditor import _file_size_label as _fsl
             rows_html = ""
             for img in filtered[:200]:
                 raw_url  = img.get("url","") or ""
@@ -3342,13 +3347,12 @@ def page_image_seo():
                 srcset_b = "<span style='color:#10B981;font-size:.8rem'>✓</span>" if img.get("has_srcset") else "<span style='color:#94A3B8;font-size:.8rem'>—</span>"
                 name_q   = "" if img.get("naming_quality") == "good" else " <span style='color:#F59E0B;font-size:.7rem' title='Poor filename'>⚠</span>"
 
-                # File size — red if > 200KB
-                _sz_bytes = img.get("file_size_bytes")
-                _sz_raw   = img.get("file_size_label","—")
+                # File size — from separate cache, red if > 200KB
+                _sz_bytes = _sz_cache.get(raw_url)
                 if _sz_bytes is not None and _sz_bytes > 200 * 1024:
-                    size_lbl = f"<b style=\"color:#EF4444\">{_sz_raw} ⚠</b>"
+                    size_lbl = f"<b style=\"color:#EF4444\">{_fsl(_sz_bytes)} ⚠</b>"
                 elif _sz_bytes is not None:
-                    size_lbl = f"<b style=\"color:#10B981\">{_sz_raw}</b>"
+                    size_lbl = f"<b style=\"color:#10B981\">{_fsl(_sz_bytes)}</b>"
                 else:
                     size_lbl = "—"
 
