@@ -17,8 +17,8 @@ WEIGHTS = {
 PENALTY = {
     "Critical": 25,
     "High":     15,
-    "Warning":  8,
-    "Medium":   5,
+    "Medium":   8,
+    "Warning":  6,   # Warning < Medium — it is a caution, not a confirmed problem
     "Low":      2,
 }
 

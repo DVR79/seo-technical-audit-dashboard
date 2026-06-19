@@ -2,15 +2,16 @@
 
 import re
 import threading
-import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from urllib.parse import urlparse, urljoin
 
+import urllib3
 import requests
 from bs4 import BeautifulSoup
 
-warnings.filterwarnings("ignore")
+# Suppress only SSL/TLS InsecureRequestWarning from urllib3 (verify=False fallback)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HEADERS = {
     "User-Agent": (
@@ -561,7 +562,7 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
     # more thoroughly, and including both would double-count heading issues.
     for key in ["metadata", "canonical", "indexability", "url_structure",
                 "content", "images", "heading_detail", "image_detail",
-                "advanced", "redirect_analysis",
+                "advanced", "redirect_analysis", "mobile_audit",
                 "internal_links", "external_links", "course_audit", "blog_audit"]:
         all_issues.extend(result.get(key, {}).get("issues", []))
     result["all_issues"] = all_issues

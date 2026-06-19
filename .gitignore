@@ -18,6 +18,7 @@ env/
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/api_keys.json
 
 # OS
 .DS_Store

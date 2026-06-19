@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from modules.image_auditor import _fetch_size
+from modules.api_key_manager import APIKeyManager, CATEGORIES, _API_FLAT, test_api_key
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -63,17 +64,11 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ── Load API keys from Streamlit secrets (permanent) into session_state ────
-# Secrets are set in the Streamlit Cloud dashboard → App settings → Secrets
-# or locally in .streamlit/secrets.toml
-for _sk, _ss in [("PSI_API_KEY", "psi_api_key_global")]:
-    if _ss not in st.session_state:
-        try:
-            _v = st.secrets.get(_sk, "")
-            if _v:
-                st.session_state[_ss] = _v
-        except Exception:
-            pass
+# ── Load all API keys from secrets/file into session state ─────────────────
+APIKeyManager._init()
+# Back-compat: keep psi_api_key_global in sync with centralized store
+if not st.session_state.get("psi_api_key_global") and APIKeyManager.has("psi"):
+    st.session_state["psi_api_key_global"] = APIKeyManager.get("psi")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -260,6 +255,7 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
     )
 
     rows_html = ""
+    import html as _h
     for lk in filtered[:max_rows]:
         url    = lk.get("url","")
         anchor = lk.get("anchor_text","") or ""
@@ -276,10 +272,13 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         )
         new_tab = "🔗" if lk.get("opens_new_tab") else ""
         noop    = "" if lk.get("has_noopener") else ("⚠️" if lk.get("opens_new_tab") else "")
-        short_url = url[:65] + ("…" if len(url) > 65 else "")
-        short_anc = anchor_display[:50] + ("…" if len(anchor_display) > 50 else "")
+        # Escape all scraped-page content before injecting into HTML
+        url_safe  = _h.escape(url)
+        short_url = _h.escape(url[:65] + ("…" if len(url) > 65 else ""))
+        short_anc = _h.escape(anchor_display[:50] + ("…" if len(anchor_display) > 50 else ""))
+        src_text  = _h.escape(lk.get('source','')[:60])
         source_col = (f"<td style='padding:7px 10px;font-size:.72rem;color:var(--seo-muted,#64748B);max-width:130px;word-break:break-all'>"
-                      f"{lk.get('source','')[:60]}</td>") if show_source else ""
+                      f"{src_text}</td>") if show_source else ""
 
         # Anchor keyword chip — color-coded like other badges
         # Blue  = good descriptive anchor (≥3 words)
@@ -294,12 +293,12 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
             anc_bg = "var(--seo-accent-light,rgba(79,70,229,.12))"
             anc_fg = "var(--seo-accent,#4F46E5)"   # indigo — descriptive keyword phrase
             anc_label = short_anc
-            anc_title = anchor_display
+            anc_title = short_anc  # already escaped
         else:
             anc_bg = "var(--seo-warning-bg,rgba(217,119,6,.10))"
             anc_fg = "var(--seo-warning,#D97706)"   # amber — short/generic anchor
             anc_label = short_anc
-            anc_title = anchor_display
+            anc_title = short_anc  # already escaped
         anchor_chip = (
             f"<span style='display:inline-block;background:{anc_bg};color:{anc_fg};"
             f"border-radius:4px;padding:2px 8px;font-size:.72rem;font-weight:700;"
@@ -311,8 +310,8 @@ def render_link_table(links, show_source=False, source_label="Source", max_rows=
         <tr style='border-bottom:1px solid var(--table-row-border,rgba(148,163,184,.15));'>
             {source_col}
             <td style='padding:7px 10px;max-width:220px;word-break:break-all'>
-                <a href='{url}' target='_blank' style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none'
-                   title='{url}'>{short_url}</a>
+                <a href='{url_safe}' target='_blank' style='font-size:.78rem;color:var(--seo-info-text,#1D4ED8);text-decoration:none'
+                   title='{url_safe}'>{short_url}</a>
             </td>
             <td style='padding:7px 10px;max-width:220px'>{anchor_chip}</td>
             <td style='padding:7px 10px;text-align:center'>{rbadge}</td>
@@ -402,9 +401,10 @@ def build_results_df(results):
 # ════════════════════════════════════════════════════════════════════════════
 
 def render_serp_preview(serp_data):
-    title = serp_data.get("title","—") or "—"
-    desc  = serp_data.get("description","") or "No meta description found."
-    bc    = serp_data.get("breadcrumb","") or serp_data.get("url","")
+    import html as _h
+    title = _h.escape(serp_data.get("title","—") or "—")
+    desc  = _h.escape(serp_data.get("description","") or "No meta description found.")
+    bc    = _h.escape(serp_data.get("breadcrumb","") or serp_data.get("url",""))
     t_long = serp_data.get("title_too_long", False)
     d_short= serp_data.get("desc_too_short", False)
     d_long = serp_data.get("desc_too_long", False)
@@ -444,10 +444,11 @@ def render_serp_preview(serp_data):
 
 
 def render_social_preview(social_data, url):
-    og_title = social_data.get("og_title","") or "No title"
-    og_desc  = social_data.get("og_description","") or "No description"
-    og_img   = social_data.get("og_image","")
-    site_name= social_data.get("og_site_name","") or url
+    import html as _h
+    og_title  = _h.escape(social_data.get("og_title","") or "No title")
+    og_desc   = _h.escape(social_data.get("og_description","") or "No description")
+    og_img    = social_data.get("og_image","")   # URL used in src= attribute only — not injected as text
+    site_name = _h.escape(social_data.get("og_site_name","") or url)
 
     img_html = (
         f'<img src="{og_img}" style="width:100%;height:200px;object-fit:cover">'
@@ -1480,13 +1481,25 @@ def page_new_audit():
             help="HTTP-check every link and show status codes (like Ahrefs). Adds ~10-30s per page.")
         fetch_psi      = st.toggle("🚀 Fetch Real PageSpeed Insights", value=False,
             help="Call Google PageSpeed Insights API for accurate Lighthouse scores (Performance, CWV). Adds ~15s per URL.")
-        psi_api_key    = ""
+        psi_api_key    = APIKeyManager.get("psi") or ""
         if fetch_psi:
-            psi_api_key = st.text_input(
-                "PSI API Key (optional — leave blank for anonymous)",
-                type="password",
-                help="Get a free key at console.cloud.google.com → PageSpeed Insights API. Anonymous limit: ~100 req/day.",
-            )
+            if psi_api_key:
+                _masked = APIKeyManager.mask(psi_api_key)
+                st.markdown(
+                    f"<div style='background:rgba(5,150,105,.10);border:1px solid rgba(5,150,105,.3);"
+                    f"border-radius:7px;padding:8px 12px;font-size:.78rem;color:var(--seo-success,#059669)'>"
+                    f"✅ Using stored PSI key &nbsp;<span style='font-family:monospace;opacity:.7'>{_masked}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    "<div style='background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);"
+                    "border-radius:7px;padding:8px 12px;font-size:.78rem;color:var(--seo-warning,#D97706)'>"
+                    "⚠️ No PSI key saved. Add one in <b>Settings → API Keys</b> for higher rate limits."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
             st.caption("📡 Real Lighthouse scores will appear in the **Mobile Audit → Core Web Vitals** tab.")
         max_workers    = st.slider("Concurrent Workers", 2, 16, 6)
         if validate_links:
@@ -4091,109 +4104,255 @@ def page_heading_analysis():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_settings():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>⚙️ Settings & API Keys</h2>",
-                unsafe_allow_html=True)
+    # ── Init edit-mode state ───────────────────────────────────────────────
+    if "_api_edit" not in st.session_state:
+        st.session_state["_api_edit"] = None
+    if "_api_test_running" not in st.session_state:
+        st.session_state["_api_test_running"] = None
 
-    st.markdown("""
-    <div class='info-box'>
-        API keys are saved in your browser session. For <b>permanent storage</b> that survives page reloads,
-        add them to <b>Streamlit Cloud Secrets</b> (instructions below).
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
+        "⚙️ Settings &amp; API Keys</h2>",
+        unsafe_allow_html=True,
+    )
 
-    # ── PageSpeed Insights API Key ─────────────────────────────────────────
-    st.markdown('<div class="section-header">🚀 Google PageSpeed Insights API Key</div>',
-                unsafe_allow_html=True)
+    # ── Summary bar ────────────────────────────────────────────────────────
+    total_apis = sum(len(c["apis"]) for c in CATEGORIES)
+    configured = APIKeyManager.configured_count()
+    pct = int(configured / total_apis * 100) if total_apis else 0
+    st.markdown(
+        f"<div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));"
+        f"border-radius:12px;padding:16px 22px;margin-bottom:18px;display:flex;align-items:center;gap:20px'>"
+        f"<div style='font-size:2rem;font-weight:800;color:var(--seo-accent,#4F46E5)'>{configured}</div>"
+        f"<div>"
+        f"<div style='font-size:.9rem;font-weight:600;color:var(--seo-heading,#0F172A)'>"
+        f"API Keys Configured</div>"
+        f"<div style='font-size:.78rem;color:var(--seo-muted,#64748B)'>"
+        f"{configured} of {total_apis} APIs configured ({pct}%)</div>"
+        f"<div style='width:200px;height:6px;background:var(--seo-border,rgba(148,163,184,.3));"
+        f"border-radius:3px;margin-top:6px'>"
+        f"<div style='width:{pct}%;height:100%;background:var(--seo-accent,#4F46E5);"
+        f"border-radius:3px'></div></div>"
+        f"</div>"
+        f"<div style='margin-left:auto;display:flex;gap:10px'>",
+        unsafe_allow_html=True,
+    )
 
-    col1, col2 = st.columns([3, 1])
-    _current_key = st.session_state.get("psi_api_key_global", "")
-    with col1:
-        _new_key = st.text_input(
-            "PageSpeed Insights API Key",
-            value=_current_key,
-            type="password",
-            placeholder="AIzaSy...",
-            help="Get a free key at console.cloud.google.com — 25,000 requests/day",
-            key="settings_psi_key",
+    # Export to Secrets format button (outside the markdown div — Streamlit widgets can't be inside HTML)
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    col_exp, col_info = st.columns([1, 3])
+    with col_exp:
+        if st.button("📋 Export to Secrets Format", use_container_width=True,
+                     help="Copy this TOML into Streamlit Cloud → App settings → Secrets"):
+            st.session_state["_show_secrets_export"] = True
+    with col_info:
+        st.markdown(
+            "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);padding-top:6px'>"
+            "Keys are stored in <code>.streamlit/api_keys.json</code> and survive page reloads. "
+            "Use <b>Export to Secrets Format</b> to copy them to Streamlit Cloud for permanent deployment."
+            "</div>",
+            unsafe_allow_html=True,
         )
-    with col2:
-        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
-        if st.button("💾 Save Key", type="primary", use_container_width=True):
-            if _new_key.strip():
-                st.session_state["psi_api_key_global"] = _new_key.strip()
-                st.success("✅ API key saved for this session!")
-            else:
-                st.session_state.pop("psi_api_key_global", None)
-                st.info("API key cleared.")
 
-    if _current_key:
-        _mid = max(0, len(_current_key) - 10)
-        masked = _current_key[:6] + "•" * _mid + _current_key[-4:] if len(_current_key) > 10 else "•" * len(_current_key)
-        st.markdown(f"""
-        <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);
-             border-radius:8px;padding:10px 14px;margin-top:6px;display:flex;align-items:center;gap:10px'>
-            <span style='font-size:1rem'>✅</span>
-            <span style='font-size:.82rem;color:#10B981;font-weight:600'>Key saved in session:</span>
-            <span style='font-size:.82rem;color:var(--seo-muted,#94A3B8);font-family:monospace'>{masked}</span>
-        </div>""", unsafe_allow_html=True)
-    else:
+    if st.session_state.get("_show_secrets_export"):
+        toml_text = APIKeyManager.export_secrets_format()
+        st.code(toml_text, language="toml")
+        if st.button("✖ Close Export", key="_close_export"):
+            st.session_state["_show_secrets_export"] = False
+            st.rerun()
+
+    # ── Search bar ─────────────────────────────────────────────────────────
+    search_q = st.text_input(
+        "🔍 Search APIs",
+        placeholder="Search by name or category…",
+        label_visibility="collapsed",
+        key="_api_search",
+    ).lower().strip()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    # ── Category sections ──────────────────────────────────────────────────
+    for cat in CATEGORIES:
+        cat_apis = cat["apis"]
+        # Apply search filter
+        if search_q:
+            cat_apis = [
+                a for a in cat_apis
+                if search_q in a[1].lower() or search_q in cat["label"].lower()
+            ]
+            if not cat_apis:
+                continue
+
+        cat_configured = sum(1 for a in cat_apis if APIKeyManager.has(a[0]))
+        cat_total = len(cat_apis)
+
+        # Category header chip
+        chip_bg   = "rgba(5,150,105,.12)"  if cat_configured > 0 else "rgba(148,163,184,.15)"
+        chip_text = "var(--seo-success,#059669)" if cat_configured > 0 else "var(--seo-muted,#64748B)"
+        chip_label = f"{cat_configured}/{cat_total}"
+
+        expander_label = (
+            f"{cat['icon']} {cat['label']}  ·  "
+            f"{cat_configured} configured"
+        )
+        with st.expander(expander_label, expanded=(cat_configured > 0 and search_q == "")):
+            for api_entry in cat_apis:
+                api_id, api_name, placeholder, docs_url, testable = api_entry
+                has_key  = APIKeyManager.has(api_id)
+                cur_key  = APIKeyManager.get(api_id)
+                masked   = APIKeyManager.mask(cur_key) if cur_key else ""
+                test_res = APIKeyManager.get_test_status(api_id)
+                is_editing = st.session_state["_api_edit"] == api_id
+
+                # Row container
+                row_bg = (
+                    "rgba(5,150,105,.06)" if has_key
+                    else "rgba(148,163,184,.07)"
+                )
+                st.markdown(
+                    f"<div style='background:{row_bg};border:1px solid var(--seo-border,rgba(148,163,184,.22));"
+                    f"border-radius:9px;padding:10px 14px;margin-bottom:8px'>",
+                    unsafe_allow_html=True,
+                )
+
+                c_name, c_status, c_actions = st.columns([3, 2, 2])
+
+                with c_name:
+                    status_dot = "🟢" if has_key else "⚪"
+                    docs_link  = (
+                        f" <a href='{docs_url}' target='_blank' "
+                        f"style='font-size:.7rem;color:var(--seo-info-text,#1D4ED8);"
+                        f"text-decoration:none;opacity:.7'>docs ↗</a>"
+                        if docs_url else ""
+                    )
+                    st.markdown(
+                        f"<div style='font-size:.84rem;font-weight:600;"
+                        f"color:var(--seo-heading,#0F172A)'>"
+                        f"{status_dot} {api_name}{docs_link}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                with c_status:
+                    if has_key:
+                        st.markdown(
+                            f"<div style='font-size:.75rem;font-family:monospace;"
+                            f"color:var(--seo-muted,#64748B);padding-top:2px'>{masked}</div>",
+                            unsafe_allow_html=True,
+                        )
+                        if test_res is not None:
+                            tc = "var(--seo-success,#059669)" if test_res["ok"] else "var(--seo-error,#DC2626)"
+                            ti = "✅" if test_res["ok"] else "❌"
+                            st.markdown(
+                                f"<div style='font-size:.72rem;color:{tc}'>{ti} {test_res['msg']}</div>",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.markdown(
+                            "<div style='font-size:.75rem;color:var(--seo-muted,#94A3B8);"
+                            "padding-top:2px;font-style:italic'>Not configured</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                with c_actions:
+                    btn_col1, btn_col2, btn_col3 = st.columns(3)
+                    with btn_col1:
+                        edit_label = "✏️ Edit" if has_key else "➕ Add"
+                        if st.button(edit_label, key=f"_edit_{api_id}", use_container_width=True):
+                            if st.session_state["_api_edit"] == api_id:
+                                st.session_state["_api_edit"] = None
+                            else:
+                                st.session_state["_api_edit"] = api_id
+                            st.rerun()
+                    with btn_col2:
+                        test_disabled = not has_key or not testable
+                        test_help = (
+                            "No test available for this API" if not testable
+                            else ("Add a key first" if not has_key else "Test connection")
+                        )
+                        if st.button(
+                            "🔌 Test", key=f"_test_{api_id}",
+                            use_container_width=True,
+                            disabled=test_disabled,
+                            help=test_help,
+                        ):
+                            with st.spinner(f"Testing {api_name}…"):
+                                ok, msg = test_api_key(api_id)
+                            st.rerun()
+                    with btn_col3:
+                        del_disabled = not has_key
+                        if st.button(
+                            "🗑️", key=f"_del_{api_id}",
+                            use_container_width=True,
+                            disabled=del_disabled,
+                            help="Remove key",
+                        ):
+                            APIKeyManager.delete(api_id)
+                            if api_id == "psi":
+                                st.session_state.pop("psi_api_key_global", None)
+                            st.rerun()
+
+                # Inline edit form
+                if is_editing:
+                    with st.form(key=f"_form_{api_id}", clear_on_submit=True):
+                        new_key = st.text_input(
+                            f"API Key for {api_name}",
+                            type="password",
+                            placeholder=placeholder,
+                            help=f"Paste your {api_name} API key here.",
+                        )
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            submitted = st.form_submit_button("💾 Save Key", type="primary", use_container_width=True)
+                        with cancel_col:
+                            cancelled = st.form_submit_button("✖ Cancel", use_container_width=True)
+
+                        if submitted:
+                            if new_key.strip():
+                                APIKeyManager.set(api_id, new_key.strip())
+                                if api_id == "psi":
+                                    st.session_state["psi_api_key_global"] = new_key.strip()
+                                st.session_state["_api_edit"] = None
+                                st.success(f"✅ {api_name} key saved.")
+                                st.rerun()
+                            else:
+                                st.warning("Key cannot be empty. Use 🗑️ to remove an existing key.")
+                        if cancelled:
+                            st.session_state["_api_edit"] = None
+                            st.rerun()
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Permanent storage instructions ─────────────────────────────────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    with st.expander("🔐 Permanent Storage — Streamlit Cloud Secrets"):
         st.markdown("""
-        <div style='background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);
-             border-radius:8px;padding:10px 14px;margin-top:6px'>
-            <span style='font-size:.82rem;color:#F59E0B'>⚠️ No key saved — anonymous PSI requests
-            are rate-limited on Streamlit Cloud.</span>
-        </div>""", unsafe_allow_html=True)
+Keys stored in `.streamlit/api_keys.json` survive page reloads during local development but are lost on Streamlit Cloud redeploy.
 
-    # ── How to get a PSI key ───────────────────────────────────────────────
-    with st.expander("📖 How to get a free PageSpeed Insights API Key"):
-        st.markdown("""
-        1. Go to **[console.cloud.google.com](https://console.cloud.google.com)**
-        2. Create a project (or select an existing one)
-        3. **APIs & Services → Library** → search **"PageSpeed Insights API"** → **Enable**
-        4. **APIs & Services → Credentials** → **+ Create Credentials → API Key**
-        5. Copy the key (starts with `AIza`) and paste it above
-        6. **Free quota:** 25,000 requests/day with a key vs. ~25/day anonymous
+**To make them permanent on Streamlit Cloud:**
+1. Click **Export to Secrets Format** above to get a TOML snippet
+2. Go to your app on [share.streamlit.io](https://share.streamlit.io)
+3. Click **⋮ Menu → Settings → Secrets**
+4. Paste the TOML and click **Save**
 
-        **Optional — restrict the key for security:**
-        - In Credentials, click the key → API restrictions → select **PageSpeed Insights API**
+The app loads Streamlit Secrets automatically on every startup — no re-entry needed.
         """)
 
-    # ── Permanent storage instructions ────────────────────────────────────
-    st.markdown('<div class="section-header">🔐 Permanent Storage (Streamlit Cloud Secrets)</div>',
-                unsafe_allow_html=True)
-    st.markdown("""
-    <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-         border-radius:10px;padding:18px 20px'>
-        <div style='font-size:.85rem;color:var(--seo-text,#374151);line-height:1.8'>
-            Session keys are lost when you close the browser. To make them permanent:<br><br>
-            <b>1.</b> Go to your app on
-            <a href='https://share.streamlit.io' target='_blank' style='color:var(--seo-info-text,#1D4ED8)'>
-            share.streamlit.io</a><br>
-            <b>2.</b> Click <b>⋮ Menu → Settings → Secrets</b><br>
-            <b>3.</b> Add this line and click <b>Save</b>:<br>
-        </div>
-        <div style='background:rgba(0,0,0,.15);border-radius:6px;padding:10px 14px;margin:10px 0;
-             font-family:monospace;font-size:.85rem;color:#10B981'>
-            PSI_API_KEY = "AIzaSy..."
-        </div>
-        <div style='font-size:.82rem;color:var(--seo-muted,#64748B)'>
-            The app automatically loads this key on every startup — no need to re-enter it.
-        </div>
-    </div>""", unsafe_allow_html=True)
-
     # ── Session info ───────────────────────────────────────────────────────
-    try:
-        _secrets_psi_set = bool(st.secrets.get("PSI_API_KEY", ""))
-    except Exception:
-        _secrets_psi_set = False
     st.markdown('<div class="section-header">ℹ️ Session Info</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-         border-radius:10px;padding:14px 18px;font-size:.82rem;color:var(--seo-text,#374151)'>
-        <b>Audited URLs in session:</b> {len(st.session_state.get("audit_results", []))}<br>
-        <b>PSI Key in session:</b> {"✅ Set" if st.session_state.get("psi_api_key_global") else "❌ Not set"}<br>
-        <b>PSI Key from Streamlit secrets:</b>
-        {"✅ Loaded" if _secrets_psi_set else "—"}
-    </div>""", unsafe_allow_html=True)
+    n_audited = len(st.session_state.get("audit_results", []))
+    st.markdown(
+        f"<div style='background:var(--seo-card-bg,#fff);"
+        f"border:1px solid var(--seo-border,rgba(148,163,184,.22));"
+        f"border-radius:10px;padding:14px 18px;font-size:.82rem;"
+        f"color:var(--seo-text,#374151)'>"
+        f"<b>Audited URLs in session:</b> {n_audited}<br>"
+        f"<b>API Keys configured:</b> {APIKeyManager.configured_count()} of {total_apis}<br>"
+        f"<b>PSI Key status:</b> {'✅ Ready' if APIKeyManager.has('psi') else '❌ Not set — audits run without PSI data'}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     if st.button("🗑️ Clear all audit data from session", type="secondary"):
         st.session_state["audit_results"] = []
         st.session_state["last_audit_date"] = None

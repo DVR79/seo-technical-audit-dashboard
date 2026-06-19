@@ -71,9 +71,9 @@ def analyze_http_headers(http_headers: dict, url: str) -> dict:
         issues.append({
             "issue": "Missing HSTS Header (Strict-Transport-Security)",
             "category": "Security",
-            "severity": "Critical",
-            "recommendation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains' to enforce HTTPS connections and improve trust signals.",
-            "impact_score": 8,
+            "severity": "Medium",
+            "recommendation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains' to enforce HTTPS connections. This is a security best practice and minor trust signal — not a direct Google ranking factor.",
+            "impact_score": 4,
             "effort": "Low",
         })
 
