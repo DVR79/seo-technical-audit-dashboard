@@ -167,11 +167,13 @@ def _build_tree_html(headings):
             if not stack or stack[-1] != level:
                 open_level(level)
 
-        empty_style = "font-style:italic;opacity:0.6;" if h["is_empty"] else ""
+        empty_style = "font-style:italic;opacity:0.55;" if h["is_empty"] else ""
         lines.append(
-            f"<li style='margin:2px 0;{empty_style}'>"
-            f"<span style='color:{color};font-weight:600;font-size:0.85em;'>{label}</span>"
-            f"<span style='color:#374151;margin-left:6px;'>{text}{skip_marker}</span>"
+            f"<li style='margin:3px 0;{empty_style}'>"
+            f"<span style='background:{color};color:#fff;border-radius:4px;"
+            f"padding:1px 7px;font-size:.72rem;font-weight:700;margin-right:8px;"
+            f"display:inline-block;min-width:28px;text-align:center'>{label}</span>"
+            f"<span style='font-size:.84rem;'>{text}{skip_marker}</span>"
             f"</li>"
         )
         prev_level = level

@@ -3715,9 +3715,10 @@ def page_heading_analysis():
         tree_html = hd.get("tree_html","")
         if tree_html:
             st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:16px 20px;font-size:.82rem;
-                 line-height:1.8;overflow-x:auto'>{tree_html}</div>""",
+            <div style='border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                 border-radius:10px;padding:16px 20px;line-height:2;overflow-x:auto'>
+                {tree_html}
+            </div>""",
                 unsafe_allow_html=True)
 
         # Sequence violations
