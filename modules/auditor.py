@@ -1,5 +1,6 @@
 """Core URL audit engine — fetches pages and runs all SEO checks."""
 
+import ipaddress
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,6 +13,30 @@ from bs4 import BeautifulSoup
 
 # Suppress only SSL/TLS InsecureRequestWarning from urllib3 (verify=False fallback)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# ── SSRF protection ────────────────────────────────────────────────────────────
+_BLOCKED_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}
+
+def validate_audit_url(url: str) -> tuple[bool, str]:
+    """Block SSRF attempts: private IPs, loopback, link-local, metadata endpoints."""
+    try:
+        p = urlparse(url)
+        if p.scheme not in ("http", "https"):
+            return False, "Only http:// and https:// URLs are supported."
+        host = (p.hostname or "").lower()
+        if not host:
+            return False, "URL has no hostname."
+        if host in _BLOCKED_HOSTS:
+            return False, "Loopback/local addresses are not allowed."
+        try:
+            addr = ipaddress.ip_address(host)
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return False, "Private or reserved IP addresses are not allowed."
+        except ValueError:
+            pass  # hostname, not raw IP — allow
+        return True, ""
+    except Exception:
+        return False, "Invalid URL format."
 
 HEADERS = {
     "User-Agent": (
@@ -92,11 +117,11 @@ def fetch_page(url):
         except Exception as e:
             return {"success": False, "error": f"SSL Error: {e}", "status_code": 0}
     except requests.exceptions.Timeout:
-        return {"success": False, "error": "Request Timeout (20s)", "status_code": 0}
-    except requests.exceptions.ConnectionError as e:
-        return {"success": False, "error": f"Connection Error: {e}", "status_code": 0}
-    except Exception as e:
-        return {"success": False, "error": str(e), "status_code": 0}
+        return {"success": False, "error": "Request timed out (20s) — check the URL is accessible.", "status_code": 0}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": "Connection failed — verify the URL and network access.", "status_code": 0}
+    except Exception:
+        return {"success": False, "error": "An unexpected error occurred while fetching the page.", "status_code": 0}
 
 
 def analyze_metadata(soup, url):
@@ -288,9 +313,9 @@ def analyze_url_structure(url, response_time=0.0):
             "Use lowercase-only URLs to avoid duplicate content issues.",
             impact_score=3, effort="Low"))
 
-    if re.search(r"[?&=#+%]", path):
-        issues.append(_issue("URL Contains Special Characters", "URL Structure", "Warning",
-            "Use clean, readable URLs without special characters.",
+    if parsed.query:
+        issues.append(_issue("URL Contains Query Parameters", "URL Structure", "Warning",
+            "Use clean, parameter-free URLs where possible. Query strings can cause duplicate content and are harder to remember/share.",
             impact_score=4, effort="Medium"))
 
     if parsed.scheme != "https":
@@ -435,6 +460,16 @@ def detect_page_type(url, soup):
 
 def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
               fetch_pagespeed=False, psi_api_key=None):
+    # SSRF protection — block private/internal URLs before making any outbound request
+    ok, ssrf_msg = validate_audit_url(url)
+    if not ok:
+        return {
+            "url": url, "audit_timestamp": datetime.now().isoformat(),
+            "status_code": 0, "audit_type": audit_type,
+            "fetch_error": ssrf_msg, "response_time": 0.0,
+            "seo_score": 0.0, "score_breakdown": {}, "all_issues": [],
+        }
+
     result = {
         "url": url,
         "audit_timestamp": datetime.now().isoformat(),

@@ -45,12 +45,14 @@ def _category_score(issues):
 def calculate_seo_score(result):
     breakdown = {
         "metadata":       _category_score(result.get("metadata",    {}).get("issues", [])),
-        "headings":       _category_score(result.get("headings",    {}).get("issues", [])),
+        # Use heading_detail (deep checks) — heading{} is the legacy shallow checker
+        "headings":       _category_score(result.get("heading_detail", result.get("headings", {})).get("issues", [])),
         "canonical":      _category_score(result.get("canonical",   {}).get("issues", [])),
         "indexability":   _category_score(result.get("indexability",{}).get("issues", [])),
         "url_structure":  _category_score(result.get("url_structure",{}).get("issues", [])),
         "content":        _category_score(result.get("content",     {}).get("issues", [])),
-        "images":         _category_score(result.get("images",      {}).get("issues", [])),
+        # Use image_detail (deep checks) — images{} is the legacy shallow checker
+        "images":         _category_score(result.get("image_detail", result.get("images", {})).get("issues", [])),
         "internal_links": _category_score(result.get("internal_links",{}).get("issues", [])),
         "external_links": _category_score(result.get("external_links",{}).get("issues", [])),
         "advanced":       _category_score(

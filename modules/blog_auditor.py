@@ -4,7 +4,7 @@ import re
 
 
 BLOG_ELEMENTS = [
-    ("Author Information",  ["author", "written by", "by ", "posted by"]),
+    ("Author Information",  ["author", "written by", "posted by", "by author"]),
     ("Published Date",      None),   # checked via tags + meta
     ("Updated Date",        ["updated", "last updated", "modified", "last modified"]),
     ("Introduction",        ["introduction", "in this article", "in this blog", "in this post",

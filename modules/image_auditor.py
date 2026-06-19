@@ -144,17 +144,25 @@ def _fetch_size(url, referer=None):
         v = h.get("Content-Length") or h.get("x-content-length") or h.get("x-uncompressed-content-length")
         return int(v) if v and str(v).isdigit() and int(v) > 1 else None
 
+    def _get(method, *args, **kwargs):
+        """Try with TLS verification first; fall back if SSLError."""
+        import requests as _r
+        try:
+            return method(*args, **kwargs, verify=True)
+        except _r.exceptions.SSLError:
+            return method(*args, **kwargs, verify=False)
+
     try:
         # ── 1. HEAD ───────────────────────────────────────────────────────
-        r = requests.head(url, timeout=10, allow_redirects=True, verify=False, headers=hdrs)
+        r = _get(requests.head, url, timeout=10, allow_redirects=True, headers=hdrs)
         if r.status_code < 400:
             sz = _cl(r.headers)
             if sz:
                 return url, sz
 
         # ── 2. Range GET ──────────────────────────────────────────────────
-        r2 = requests.get(url, timeout=10, allow_redirects=True, verify=False,
-                          headers={**hdrs, "Range": "bytes=0-1"}, stream=True)
+        r2 = _get(requests.get, url, timeout=10, allow_redirects=True,
+                  headers={**hdrs, "Range": "bytes=0-1"}, stream=True)
         r2.close()
         if r2.status_code in (200, 206):
             cr = r2.headers.get("Content-Range", "")
@@ -167,8 +175,8 @@ def _fetch_size(url, referer=None):
                 return url, sz
 
         # ── 3. Streaming GET (headers only, no body) ──────────────────────
-        r3 = requests.get(url, timeout=10, allow_redirects=True, verify=False,
-                          headers=hdrs, stream=True)
+        r3 = _get(requests.get, url, timeout=10, allow_redirects=True,
+                  headers=hdrs, stream=True)
         r3.close()
         if r3.status_code == 200:
             sz = _cl(r3.headers)
@@ -516,6 +524,10 @@ def analyze_images_advanced(soup, base_url="", check_sizes=False, max_size_check
     """
     images = _extract_image_data(soup, base_url)
     _mark_lcp_candidate(images)
+    # LCP image must NOT be lazy-loaded — remove that per-image issue for it
+    for img in images:
+        if img.get("is_lcp_candidate"):
+            img["issues"] = [i for i in img.get("issues", []) if i != "Missing lazy loading"]
 
     if check_sizes and images:
         _populate_sizes(images, max_size_checks, base_url=base_url)

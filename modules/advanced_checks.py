@@ -302,12 +302,12 @@ def analyze_technical_seo(soup, url: str, page_size_bytes: int, response_time: f
     ]
     has_preload = len(preload_tags) > 0
 
-    if external_script_count > 0 and not has_preconnect and not has_dns_prefetch:
+    if external_script_count > 3 and not has_preconnect and not has_dns_prefetch:
         issues.append({
-            "issue": "No Resource Hints (preconnect/dns-prefetch) for External Resources",
+            "issue": f"No Resource Hints for {external_script_count} External Scripts",
             "category": "Performance",
             "severity": "Low",
-            "recommendation": "Add <link rel='preconnect'> or <link rel='dns-prefetch'> for external script domains to speed up connection setup.",
+            "recommendation": "Add <link rel='preconnect'> or <link rel='dns-prefetch'> for your most critical external script domains (e.g. analytics, fonts). Focus on domains you control or that block rendering.",
             "impact_score": 3,
             "effort": "Low",
         })

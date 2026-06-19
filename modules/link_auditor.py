@@ -239,19 +239,35 @@ def validate_url(url):
             "note": "Skipped — site blocks automated requests",
         }
 
+    ssl_error = False
     try:
-        resp = requests.head(
-            url, headers=HEADERS, timeout=TIMEOUT,
-            allow_redirects=True, verify=False
-        )
+        try:
+            resp = requests.head(
+                url, headers=HEADERS, timeout=TIMEOUT,
+                allow_redirects=True, verify=True
+            )
+        except requests.exceptions.SSLError:
+            ssl_error = True
+            resp = requests.head(
+                url, headers=HEADERS, timeout=TIMEOUT,
+                allow_redirects=True, verify=False
+            )
         code = resp.status_code
 
         if code in (405, 501):
-            resp = requests.get(
-                url, headers=HEADERS, timeout=TIMEOUT,
-                allow_redirects=True, verify=False,
-                stream=True
-            )
+            try:
+                resp = requests.get(
+                    url, headers=HEADERS, timeout=TIMEOUT,
+                    allow_redirects=True, verify=True,
+                    stream=True
+                )
+            except requests.exceptions.SSLError:
+                ssl_error = True
+                resp = requests.get(
+                    url, headers=HEADERS, timeout=TIMEOUT,
+                    allow_redirects=True, verify=False,
+                    stream=True
+                )
             resp.close()
             code = resp.status_code
 
@@ -267,6 +283,7 @@ def validate_url(url):
             "is_redirect":    h == "redirect",
             "final_url":      resp.url,
             "redirect_count": len(resp.history),
+            "ssl_error":      ssl_error,
         }
 
     except requests.exceptions.Timeout:
