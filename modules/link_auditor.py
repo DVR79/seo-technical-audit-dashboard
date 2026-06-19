@@ -22,6 +22,10 @@ HEADERS = {
 }
 TIMEOUT = 8
 
+# Reuse TCP connections for all link validation requests in a session
+_session = requests.Session()
+_session.headers.update(HEADERS)
+
 # Sites that always block HEAD/GET with non-standard codes — don't count as "broken"
 KNOWN_BLOCKER_DOMAINS = {
     "linkedin.com", "www.linkedin.com",
@@ -242,31 +246,25 @@ def validate_url(url):
     ssl_error = False
     try:
         try:
-            resp = requests.head(
-                url, headers=HEADERS, timeout=TIMEOUT,
-                allow_redirects=True, verify=True
+            resp = _session.head(
+                url, timeout=TIMEOUT, allow_redirects=True, verify=True
             )
         except requests.exceptions.SSLError:
             ssl_error = True
-            resp = requests.head(
-                url, headers=HEADERS, timeout=TIMEOUT,
-                allow_redirects=True, verify=False
+            resp = _session.head(
+                url, timeout=TIMEOUT, allow_redirects=True, verify=False
             )
         code = resp.status_code
 
         if code in (405, 501):
             try:
-                resp = requests.get(
-                    url, headers=HEADERS, timeout=TIMEOUT,
-                    allow_redirects=True, verify=True,
-                    stream=True
+                resp = _session.get(
+                    url, timeout=TIMEOUT, allow_redirects=True, verify=True, stream=True
                 )
             except requests.exceptions.SSLError:
                 ssl_error = True
-                resp = requests.get(
-                    url, headers=HEADERS, timeout=TIMEOUT,
-                    allow_redirects=True, verify=False,
-                    stream=True
+                resp = _session.get(
+                    url, timeout=TIMEOUT, allow_redirects=True, verify=False, stream=True
                 )
             resp.close()
             code = resp.status_code

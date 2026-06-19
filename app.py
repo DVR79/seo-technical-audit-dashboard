@@ -25,9 +25,14 @@ st.set_page_config(
 )
 
 # ── Custom CSS ─────────────────────────────────────────────────────────────
-css_path = Path("assets/style.css")
-if css_path.exists():
-    st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
+@st.cache_resource
+def _load_css():
+    p = Path("assets/style.css")
+    return p.read_text(encoding="utf-8") if p.exists() else ""
+
+_css = _load_css()
+if _css:
+    st.markdown(f"<style>{_css}</style>", unsafe_allow_html=True)
 
 # ── Block Streamlit's 'C' keyboard shortcut (triggers Clear Caches dialog) ─
 # Streamlit registers 'C' as a hotkey. When users press Ctrl+C to copy text
@@ -533,31 +538,32 @@ def render_inline_result(r):
 
     # ── Score banner ──────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style='background:linear-gradient(135deg,#0F172A,#1E293B);border-radius:14px;
-    padding:20px 28px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap'>
+    <div style='background:var(--seo-banner-bg,linear-gradient(135deg,#0F172A,#1E293B));border-radius:14px;
+    padding:20px 28px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;
+    border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
         <div style='text-align:center;min-width:90px'>
             <div style='font-size:3rem;font-weight:800;color:{color};line-height:1'>{score}</div>
-            <div style='font-size:.78rem;color:#94A3B8;margin-top:2px'>SEO Score / 100</div>
+            <div style='font-size:.78rem;color:var(--seo-banner-muted,#94A3B8);margin-top:2px'>SEO Score / 100</div>
             <div style='margin-top:6px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
         </div>
         <div style='flex:1;min-width:200px'>
-            <div style='font-size:.95rem;font-weight:700;color:#F1F5F9;margin-bottom:6px;word-break:break-all'>
+            <div style='font-size:.95rem;font-weight:700;color:var(--seo-banner-text,#F1F5F9);margin-bottom:6px;word-break:break-all'>
                 {r.get("url","")[:100]}
             </div>
-            <div style='font-size:.8rem;color:#94A3B8'>
-                Type: <b style='color:#CBD5E1'>{atype.title()}</b> &nbsp;|&nbsp;
-                HTTP: <b style='color:#CBD5E1'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
-                Response: <b style='color:#CBD5E1'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
-                Redirects: <b style='color:#CBD5E1'>{r.get("redirect_count",0)}</b>
+            <div style='font-size:.8rem;color:var(--seo-banner-muted,#94A3B8)'>
+                Type: <b style='color:var(--seo-banner-label,#CBD5E1)'>{atype.title()}</b> &nbsp;|&nbsp;
+                HTTP: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
+                Response: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
+                Redirects: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("redirect_count",0)}</b>
             </div>
             <div style='margin-top:10px;display:flex;gap:10px;flex-wrap:wrap'>
-                <span style='background:#1E3A5F;color:#93C5FD;padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:var(--seo-info-bg,rgba(29,78,216,.18));color:var(--seo-info-text,#93C5FD);padding:4px 10px;border-radius:8px;font-size:.78rem'>
                     Issues: <b>{len(issues)}</b></span>
-                <span style='background:#450A0A;color:#FCA5A5;padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:var(--seo-error-bg,rgba(220,38,38,.18));color:var(--seo-error,#FCA5A5);padding:4px 10px;border-radius:8px;font-size:.78rem'>
                     Critical: <b>{crit_n}</b></span>
-                <span style='background:#431407;color:#FDBA74;padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:var(--seo-warning-bg,rgba(217,119,6,.18));color:var(--seo-warning,#FDBA74);padding:4px 10px;border-radius:8px;font-size:.78rem'>
                     High: <b>{high_n}</b></span>
-                <span style='background:#052E16;color:#86EFAC;padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:var(--seo-success-bg,rgba(5,150,105,.18));color:var(--seo-success,#86EFAC);padding:4px 10px;border-radius:8px;font-size:.78rem'>
                     Words: <b>{cont.get("word_count",0):,}</b></span>
             </div>
         </div>
@@ -571,11 +577,12 @@ def render_inline_result(r):
 
     # Tab 0 — Summary
     with tabs[0]:
-        k1,k2,k3,k4,k5,k6,k7,k8 = st.columns(8)
+        k1,k2,k3,k4 = st.columns(4)
         k1.metric("H1",          head.get("h1_count",0))
         k2.metric("H2",          head.get("h2_count",0))
         k3.metric("Images",      imgs.get("total_images",0))
         k4.metric("Missing Alt", imgs.get("missing_alt_count",0))
+        k5,k6,k7,k8 = st.columns(4)
         k5.metric("Int. Links",  il.get("total_links",0))
         k6.metric("Ext. Links",  el_.get("total_links",0))
         k7.metric("Broken",      (il.get("broken_count",0) or 0) + (el_.get("broken_count",0) or 0))
@@ -1672,6 +1679,9 @@ def page_results():
     st.caption(f"Showing **{len(df_f)}** of {len(df)} URLs")
 
     def color_score(val):
+        if val == 0:
+            # 0 may mean a fetch error — use neutral gray instead of alarming red
+            return "background-color:#F1F5F9;color:#64748B;font-weight:600"
         if val >= 90: return "background-color:#D1FAE5;color:#065F46;font-weight:600"
         if val >= 75: return "background-color:#DBEAFE;color:#1E40AF;font-weight:600"
         if val >= 50: return "background-color:#FEF3C7;color:#92400E;font-weight:600"
@@ -1696,11 +1706,24 @@ def page_results():
         st.session_state.page = "URL Detail"
         st.rerun()
 
-    if st.button("🗑️ Clear All Results", type="secondary"):
-        st.session_state.audit_results  = []
-        st.session_state.last_audit_date= None
-        st.session_state.single_result  = None
-        st.rerun()
+    if st.session_state.get("_confirm_clear"):
+        st.warning("⚠️ This will delete all audit results from this session. Are you sure?")
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            if st.button("✔ Yes, Clear All", type="primary", use_container_width=True):
+                st.session_state.audit_results   = []
+                st.session_state.last_audit_date = None
+                st.session_state.single_result   = None
+                st.session_state["_confirm_clear"] = False
+                st.rerun()
+        with cc2:
+            if st.button("✖ Cancel", use_container_width=True):
+                st.session_state["_confirm_clear"] = False
+                st.rerun()
+    else:
+        if st.button("🗑️ Clear All Results", type="secondary"):
+            st.session_state["_confirm_clear"] = True
+            st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2386,7 +2409,8 @@ def page_link_analysis():
 
     with tab_ov:
         st.markdown('<div class="section-header">🔵 Internal Links Summary</div>', unsafe_allow_html=True)
-        ic = st.columns(8)
+        ic1 = st.columns(4)
+        ic2 = st.columns(4)
         _kv = [
             ("Total",      i_total,   "#3B82F6", "int", "all"),
             ("Unique URLs",i_unique,  "#6366F1", "int", "unique"),
@@ -2397,12 +2421,13 @@ def page_link_analysis():
             ("New Tab",    i_new_tab, "#8B5CF6", "int", "new_tab"),
             ("Weak Anchor",i_weak,    "#F59E0B", "int", "weak"),
         ]
-        for col, (label, val, clr, fkind, fkey) in zip(ic, _kv):
+        for col, (label, val, clr, fkind, fkey) in zip(ic1 + ic2, _kv):
             _kpi_card_btn(col, label, val, clr, fkind, fkey)
 
         st.markdown('<div class="section-header" style="margin-top:20px">🟣 External Links Summary</div>',
                     unsafe_allow_html=True)
-        ec = st.columns(8)
+        ec1 = st.columns(4)
+        ec2 = st.columns(4)
         _kv_e = [
             ("Total",      e_total,   "#7C3AED", "ext", "all"),
             ("Domains",    e_unique,  "#6366F1", "ext", "unique"),
@@ -2413,7 +2438,7 @@ def page_link_analysis():
             ("No Security",e_no_sec,  "#F97316", "ext", "no_security"),
             ("Weak Anchor",e_weak,    "#F59E0B", "ext", "weak"),
         ]
-        for col, (label, val, clr, fkind, fkey) in zip(ec, _kv_e):
+        for col, (label, val, clr, fkind, fkey) in zip(ec1 + ec2, _kv_e):
             _kpi_card_btn(col, label, val, clr, fkind, fkey)
 
         # ── Filtered link table driven by card clicks ─────────────────────
@@ -3435,18 +3460,19 @@ def _page_image_seo_body():
                 st.session_state["img_filter"] = None if st.session_state.get("img_filter") == fkey else fkey
                 st.rerun()
 
-    kc = st.columns(9)
+    kc1 = st.columns(5)
+    kc2 = st.columns(4)
     _large_val = _large_count if _sizes_fetched else "—"
     _img_kpis = [
-        (kc[0], "Total",         im.get("total",0),               "#3B82F6", "all"),
-        (kc[1], "Missing Alt",   im.get("missing_alt",0),          "#EF4444", "missing"),
-        (kc[2], "Empty Alt",     im.get("empty_alt",0),            "#F97316", "empty"),
-        (kc[3], "Generic Alt",   im.get("generic_alt",0),          "#F59E0B", "generic"),
-        (kc[4], "No Lazy Load",  im.get("no_lazy",0),              "#8B5CF6", "no_lazy"),
-        (kc[5], "No Dimensions", im.get("no_dimensions",0),        "#F97316", "no_dims"),
-        (kc[6], "Non-WebP",      im.get("non_webp_jpg_png",0),     "#06B6D4", "non_webp"),
-        (kc[7], "Bad Naming",    im.get("bad_naming",0),           "#94A3B8", "bad_name"),
-        (kc[8], ">200KB",        _large_val,                       "#EF4444", "large_size"),
+        (kc1[0], "Total",         im.get("total",0),               "#3B82F6", "all"),
+        (kc1[1], "Missing Alt",   im.get("missing_alt",0),          "#EF4444", "missing"),
+        (kc1[2], "Empty Alt",     im.get("empty_alt",0),            "#F97316", "empty"),
+        (kc1[3], "Generic Alt",   im.get("generic_alt",0),          "#F59E0B", "generic"),
+        (kc1[4], "No Lazy Load",  im.get("no_lazy",0),              "#8B5CF6", "no_lazy"),
+        (kc2[0], "No Dimensions", im.get("no_dimensions",0),        "#F97316", "no_dims"),
+        (kc2[1], "Non-WebP",      im.get("non_webp_jpg_png",0),     "#06B6D4", "non_webp"),
+        (kc2[2], "Bad Naming",    im.get("bad_naming",0),           "#94A3B8", "bad_name"),
+        (kc2[3], ">200KB",        _large_val,                       "#EF4444", "large_size"),
     ]
     for col, lbl, val, clr, fkey in _img_kpis:
         _img_kpi_btn(col, lbl, val, clr, fkey)

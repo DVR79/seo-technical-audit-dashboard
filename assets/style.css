@@ -210,22 +210,22 @@ body[data-theme="dark"],
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   SIDEBAR — deep navy, always dark
+   SIDEBAR — theme-aware (dark by default, adapts to light mode)
    ══════════════════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-    background: linear-gradient(175deg, #0D1526 0%, #111827 60%, #0F1A2E 100%) !important;
-    border-right: 1px solid rgba(79,70,229,0.2) !important;
+    background: var(--seo-sidebar-bg, linear-gradient(175deg, #0D1526 0%, #111827 60%, #0F1A2E 100%)) !important;
+    border-right: 1px solid var(--seo-sidebar-border, rgba(79,70,229,0.2)) !important;
 }
-[data-testid="stSidebar"] * { color: #C7D2FE !important; }
+[data-testid="stSidebar"] * { color: var(--seo-sidebar-text, #C7D2FE) !important; }
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: #EEF2FF !important;
+    color: var(--seo-sidebar-heading, #EEF2FF) !important;
     font-weight: 700 !important;
     letter-spacing: -0.01em;
 }
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    color: #6B7A99 !important;
+    color: var(--seo-sidebar-muted, #6B7A99) !important;
     font-size: .77rem;
     line-height: 1.5;
 }
