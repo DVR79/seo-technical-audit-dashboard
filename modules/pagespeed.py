@@ -95,9 +95,9 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
     cls  = _extract_metric(audits, "cumulative-layout-shift")
     si   = _extract_metric(audits, "speed-index")
     ttfb = _extract_metric(audits, "server-response-time")
-    inp  = _extract_metric(audits, "experimental-interaction-to-next-paint")
-
-    # If INP not available fall back to graceful placeholder
+    inp  = _extract_metric(audits, "interaction-to-next-paint")
+    if not inp.get("value") or inp["value"] == "—":
+        inp = _extract_metric(audits, "experimental-interaction-to-next-paint")
     if not inp.get("value") or inp["value"] == "—":
         inp = {"value": "Not available", "numericValue": None, "score": None, "status": "info"}
 

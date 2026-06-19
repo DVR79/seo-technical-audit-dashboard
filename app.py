@@ -2114,7 +2114,7 @@ def page_link_analysis():
 
     from modules.link_auditor import (
         get_base_domain, categorize_domain,
-        analyze_anchor_text, get_internal_link_opportunities,
+        analyze_anchor_text,
     )
 
     # ── Build flat link lists with source URL attached ────────────────────
@@ -2740,29 +2740,19 @@ def page_performance():
         "⚡ Performance Audit</h2>",
         unsafe_allow_html=True,
     )
-    tab_mobile, tab_image, tab_cwv = st.tabs([
+    tab_mobile, tab_image = st.tabs([
         "📱 Mobile Audit",
         "🖼️ Image SEO",
-        "⚡ Core Web Vitals",
     ])
     with tab_mobile:
         _page_mobile_audit_body()
     with tab_image:
         _page_image_seo_body()
-    with tab_cwv:
-        _page_cwv_body()
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # Mobile Audit Page
 # ════════════════════════════════════════════════════════════════════════════
-
-def page_mobile_audit():
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📱 Mobile SEO Audit</h2>",
-        unsafe_allow_html=True,
-    )
-    _page_mobile_audit_body()
 
 def _page_mobile_audit_body():
     results = st.session_state.audit_results
@@ -2967,16 +2957,44 @@ def _page_mobile_audit_body():
                     else:
                         st.error(f"PSI error: {_result.get('error','Unknown error')}")
         else:
-            st.markdown("""
-            <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.35);
-                 border-radius:8px;padding:8px 16px;margin-bottom:12px;display:inline-block'>
-                <span style='font-size:.82rem;color:#10B981;font-weight:600'>
-                    ✅ Real Lighthouse data — PageSpeed Insights API</span>
-            </div>""", unsafe_allow_html=True)
-            if st.button("🔄 Re-fetch PageSpeed Insights", key=f"psi_refetch_{current_url}"):
-                if psi_cache_key in st.session_state:
-                    del st.session_state[psi_cache_key]
-                st.rerun()
+            _ref_col, _btn_col = st.columns([4, 2])
+            with _ref_col:
+                st.markdown("""
+                <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.35);
+                     border-radius:8px;padding:8px 16px;display:inline-block'>
+                    <span style='font-size:.82rem;color:#10B981;font-weight:600'>
+                        ✅ Real Lighthouse data — PageSpeed Insights API</span>
+                </div>""", unsafe_allow_html=True)
+            with _btn_col:
+                if st.button("🔄 Re-fetch", key=f"psi_refetch_{current_url}", use_container_width=True):
+                    if psi_cache_key in st.session_state:
+                        del st.session_state[psi_cache_key]
+                    st.rerun()
+
+            # 4 PSI category score tiles
+            _ps4 = [
+                ("⚡ Performance",    _live_psi.get("performance_score")),
+                ("♿ Accessibility",  _live_psi.get("accessibility_score")),
+                ("🔍 SEO",            _live_psi.get("seo_score")),
+                ("✅ Best Practices", _live_psi.get("best_practices_score")),
+            ]
+            st.markdown("<br>", unsafe_allow_html=True)
+            _s4cols = st.columns(4)
+            for _sc4, (_lbl4, _sv4) in zip(_s4cols, _ps4):
+                _clr4 = "#10B981" if (_sv4 or 0) >= 90 else "#F59E0B" if (_sv4 or 0) >= 50 else "#EF4444"
+                _rat4 = "Good" if (_sv4 or 0) >= 90 else "Needs Improvement" if (_sv4 or 0) >= 50 else "Poor"
+                with _sc4:
+                    st.markdown(f"""
+                    <div style='background:var(--seo-card-bg,#fff);
+                         border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                         border-top:4px solid {_clr4};border-radius:10px;
+                         padding:14px;text-align:center;margin-bottom:12px'>
+                        <div style='font-size:2rem;font-weight:900;color:{_clr4}'>{_sv4 if _sv4 is not None else "—"}</div>
+                        <div style='font-size:.75rem;font-weight:700;
+                             color:var(--seo-heading,#0F172A);margin-top:4px'>{_lbl4}</div>
+                        <div style='font-size:.68rem;color:{_clr4};margin-top:3px;font-weight:600'>{_rat4}</div>
+                    </div>""", unsafe_allow_html=True)
+            st.markdown("---")
 
         # Use live PSI data if available, otherwise keep heuristic cwv
         if _has_real:
@@ -3139,13 +3157,6 @@ def _page_mobile_audit_body():
 # ════════════════════════════════════════════════════════════════════════════
 # Image SEO Page
 # ════════════════════════════════════════════════════════════════════════════
-
-def page_image_seo():
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🖼️ Image SEO Audit</h2>",
-        unsafe_allow_html=True,
-    )
-    _page_image_seo_body()
 
 def _page_image_seo_body():
     results = st.session_state.audit_results
@@ -3794,310 +3805,217 @@ def page_heading_analysis():
                 </div>""", unsafe_allow_html=True)
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Core Web Vitals
-# ════════════════════════════════════════════════════════════════════════════
-
-def page_cwv():
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
-        "⚡ Core Web Vitals</h2>",
-        unsafe_allow_html=True,
-    )
-    _page_cwv_body()
-
 def _page_cwv_body():
-    from modules.cwv_auditor import fetch_psi, parse_psi, THRESHOLDS, _color, _rating
+    """
+    Core Web Vitals — powered by the same pagespeed.py + psi_api_key_global
+    that the Mobile Audit uses. Cache shared at psi_live_{url}.
+    """
+    import re as _re
+    from modules.pagespeed import fetch_pagespeed
 
     results = st.session_state.audit_results
     if not results:
         _no_data_info(); return
 
-    # ── URL selector + strategy picker ───────────────────────────────────────
     urls = [r.get("url", "") for r in results]
-    c1, c2, c3 = st.columns([4, 2, 2])
+
+    # ── Controls ─────────────────────────────────────────────────────────────
+    c1, c2 = st.columns([5, 2])
     with c1:
         sel = st.selectbox("Select URL", range(len(urls)),
                            format_func=lambda i: urls[i][-100:], key="cwv_url_sel")
     with c2:
         strategy = st.selectbox("Device", ["mobile", "desktop"], key="cwv_strategy")
-    with c3:
-        api_key = st.text_input("PSI API Key (optional)", type="password",
-                                key="cwv_api_key",
-                                help="Leave blank for free tier (25 k req/day). "
-                                     "Get a free key at console.cloud.google.com")
 
     target_url = urls[sel]
-    cache_key  = f"cwv_{sel}_{strategy}"
+    cache_key  = f"psi_live_{target_url}"   # same key Mobile Audit writes to
 
-    # ── Run button ───────────────────────────────────────────────────────────
-    run_col, info_col = st.columns([2, 5])
-    with run_col:
-        run_btn = st.button("⚡ Run CWV Analysis", key="cwv_run_btn",
-                            use_container_width=True)
-    with info_col:
-        if cache_key in st.session_state:
-            _ts = st.session_state[cache_key].get("_fetched_at", "")
+    # ── API key banner ────────────────────────────────────────────────────────
+    _api_key = st.session_state.get("psi_api_key_global", "").strip() or None
+    if _api_key:
+        _masked = _api_key[:6] + "•" * max(0, len(_api_key) - 10) + _api_key[-4:]
+        st.markdown(
+            f"<div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);"
+            f"border-radius:8px;padding:8px 14px;font-size:.8rem;color:#10B981;margin-bottom:8px'>"
+            f"✅ Using API key from Settings: <code>{_masked}</code></div>",
+            unsafe_allow_html=True)
+    else:
+        st.markdown(
+            "<div style='background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.3);"
+            "border-radius:8px;padding:8px 14px;font-size:.8rem;color:#F59E0B;margin-bottom:8px'>"
+            "⚠️ No API key set — go to <b>⚙️ Settings</b> to save your Google API key for "
+            "accurate results.</div>",
+            unsafe_allow_html=True)
+
+    # ── Fetch button ──────────────────────────────────────────────────────────
+    btn_col, status_col = st.columns([2, 5])
+    _psi = st.session_state.get(cache_key)
+    _has_data = bool(_psi and _psi.get("success"))
+    with btn_col:
+        _fetch = st.button("🚀 Fetch PageSpeed Insights", key=f"cwv_fetch_{sel}_{strategy}",
+                           type="primary", use_container_width=True)
+    with status_col:
+        if _has_data:
+            _src = _psi.get("source", "PageSpeed Insights")
             st.markdown(
-                f"<div style='padding:7px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
-                f"✅ Data loaded &nbsp;|&nbsp; {_ts} &nbsp;|&nbsp; "
-                f"Click <b>Run CWV Analysis</b> to refresh.</div>",
+                f"<div style='padding:7px 0;font-size:.78rem;color:#10B981'>"
+                f"✅ Data loaded — {_src} &nbsp;·&nbsp; Strategy: {_psi.get('strategy','—')} "
+                f"&nbsp;·&nbsp; Click button to re-fetch.</div>",
                 unsafe_allow_html=True)
         else:
             st.markdown(
-                "<div style='padding:7px 0;font-size:.75rem;color:var(--seo-muted,#64748B)'>"
-                "No data yet — click <b>Run CWV Analysis</b> to fetch from Google PageSpeed Insights.</div>",
+                "<div style='padding:7px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
+                "No data yet. Click the button to fetch from Google PageSpeed Insights (~15 s).</div>",
                 unsafe_allow_html=True)
 
-    if run_btn:
+    if _fetch:
         _ph = st.empty()
-        _ph.info(f"Fetching PageSpeed Insights for **{target_url[-70:]}** ({strategy})…")
-        _key = api_key.strip() or None
-        _data, _err = fetch_psi(target_url, strategy=strategy, api_key=_key)
-        if _err or not _data:
-            _ph.error(f"Failed to fetch: {_err or 'No data returned'}")
+        _ph.info(f"Calling PageSpeed Insights for **{target_url[-70:]}** ({strategy})…")
+        _result = fetch_pagespeed(target_url, strategy=strategy, api_key=_api_key)
+        if _result.get("success"):
+            _result["strategy"] = strategy
+            st.session_state[cache_key] = _result
+            _ph.empty()
+            st.rerun()
+        elif _result.get("error_code") == 429:
+            _ph.empty()
+            st.error("Rate limited — make sure the PageSpeed Insights API is enabled in your "
+                     "Google Cloud project and your key has no referrer restrictions.")
             st.stop()
-        _parsed = parse_psi(_data)
-        import datetime as _dt
-        _parsed["_fetched_at"] = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
-        st.session_state[cache_key] = _parsed
-        _ph.empty()
-        st.rerun()
+        else:
+            _ph.empty()
+            st.error(f"PSI error: {_result.get('error','Unknown error')}")
+            st.stop()
 
-    if cache_key not in st.session_state:
-        st.info("Select a URL and click **⚡ Run CWV Analysis** — results appear here instantly.")
+    if not _has_data:
+        st.info("Click **🚀 Fetch PageSpeed Insights** above to load real Lighthouse data.")
         return
 
-    cwv = st.session_state[cache_key]
-    perf = cwv.get("performance_score", 0)
-    lab  = cwv.get("lab", {})
-    fld  = cwv.get("field", {})
-    opps = cwv.get("opportunities", [])
-    has_field = cwv.get("has_field_data", False)
+    # ── Score summary row ─────────────────────────────────────────────────────
+    def _score_clr(s):
+        if s is None: return "#94A3B8"
+        return "#10B981" if s >= 90 else "#F59E0B" if s >= 50 else "#EF4444"
 
-    # ── Performance score ring ────────────────────────────────────────────────
-    _perf_clr = "#10B981" if perf >= 90 else "#F59E0B" if perf >= 50 else "#EF4444"
-    _perf_lbl = "Good" if perf >= 90 else "Needs Improvement" if perf >= 50 else "Poor"
+    def _score_lbl(s):
+        if s is None: return "—"
+        return "Good" if s >= 90 else "Needs Improvement" if s >= 50 else "Poor"
+
+    _scores = [
+        ("⚡ Performance",   _psi.get("performance_score")),
+        ("♿ Accessibility", _psi.get("accessibility_score")),
+        ("🔍 SEO",           _psi.get("seo_score")),
+        ("✅ Best Practices",_psi.get("best_practices_score")),
+    ]
+    st.markdown("<br>", unsafe_allow_html=True)
+    _scols = st.columns(4)
+    for _sc, (_lbl, _sv) in zip(_scols, _scores):
+        _clr = _score_clr(_sv)
+        with _sc:
+            _disp = str(_sv) if _sv is not None else "—"
+            st.markdown(f"""
+            <div style='background:var(--seo-card-bg,#fff);
+                 border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                 border-top:4px solid {_clr};border-radius:10px;
+                 padding:14px;text-align:center'>
+                <div style='font-size:2rem;font-weight:900;color:{_clr}'>{_disp}</div>
+                <div style='font-size:.75rem;font-weight:700;
+                     color:var(--seo-heading,#0F172A);margin-top:4px'>{_lbl}</div>
+                <div style='font-size:.68rem;color:{_clr};margin-top:3px;font-weight:600'>
+                    {_score_lbl(_sv)}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    sc1, sc2, sc3 = st.columns([1, 1, 3])
-    with sc1:
-        fig_ring = go.Figure(go.Pie(
-            values=[perf, 100 - perf],
-            hole=0.72,
-            marker_colors=[_perf_clr, "rgba(148,163,184,.12)"],
-            textinfo="none",
-            hoverinfo="skip",
-        ))
-        fig_ring.add_annotation(
-            text=f"<b>{perf}</b>", x=0.5, y=0.55,
-            font=dict(size=32, color=_perf_clr), showarrow=False)
-        fig_ring.add_annotation(
-            text="Performance", x=0.5, y=0.35,
-            font=dict(size=11, color="#64748B"), showarrow=False)
-        fig_ring.update_layout(showlegend=False, height=200,
-                               margin=dict(t=10, b=10, l=10, r=10),
-                               paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_ring, use_container_width=True)
-    with sc2:
-        _strat_icon = "📱" if cwv.get("strategy") == "mobile" else "🖥️"
-        st.markdown(f"""
-        <div style='padding:16px 0'>
-            <div style='font-size:2rem'>{_strat_icon}</div>
-            <div style='font-size:.85rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-top:4px'>
-                {strategy.title()}</div>
-            <div style='margin-top:8px'>
-                <span style='background:{_perf_clr};color:#fff;padding:4px 14px;
-                      border-radius:999px;font-size:.8rem;font-weight:700'>{_perf_lbl}</span>
-            </div>
-            <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:8px'>
-                Source: Google PageSpeed Insights<br>
-                {cwv.get("_fetched_at","")}</div>
-        </div>""", unsafe_allow_html=True)
-    with sc3:
-        st.markdown("""
-        <div style='font-size:.78rem;color:var(--seo-muted,#64748B);padding:12px 0 4px'>
-            <b style='color:var(--seo-heading,#0F172A)'>Score guide:</b>
-            &nbsp;<span style='color:#10B981;font-weight:700'>90–100 Good</span>
-            &nbsp;|&nbsp;<span style='color:#F59E0B;font-weight:700'>50–89 Needs Improvement</span>
-            &nbsp;|&nbsp;<span style='color:#EF4444;font-weight:700'>0–49 Poor</span>
-        </div>""", unsafe_allow_html=True)
-
     st.markdown("---")
 
-    # ── Tab: Lab data / Field data / Opportunities ───────────────────────────
-    tab_lab, tab_field, tab_opps = st.tabs(
-        ["🔬 Lab Data (Lighthouse)", "👥 Field Data (Real Users)", "🛠️ Opportunities"])
+    # ── Metric cards + Opportunities tabs ────────────────────────────────────
+    tab_metrics, tab_opps = st.tabs(["📊 Core Web Vitals Metrics", "🛠️ Opportunities & Quick Wins"])
 
-    # ─────────────────────────── LAB DATA ────────────────────────────────────
-    with tab_lab:
+    # Helper: score 0-1 → color
+    def _sc(score):
+        if score is None: return "#94A3B8"
+        return "#10B981" if score >= 0.9 else "#F59E0B" if score >= 0.5 else "#EF4444"
+
+    def _badge(score):
+        if score is None: return "— N/A"
+        return "✅ Good" if score >= 0.9 else "⚠️ Needs Improvement" if score >= 0.5 else "❌ Poor"
+
+    # ── METRICS TAB ──────────────────────────────────────────────────────────
+    with tab_metrics:
         st.markdown(
-            "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
-            "Simulated performance in a controlled lab environment (Lighthouse)."
-            "</div>", unsafe_allow_html=True)
+            "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:14px'>"
+            "Real Lighthouse scores — simulated lab environment on a mobile/desktop device.</div>",
+            unsafe_allow_html=True)
 
-        _lab_defs = [
-            ("lcp",  "🖼️ LCP",  "Largest Contentful Paint",   "< 2.5 s",  "Time for the largest image/text block to load."),
-            ("fcp",  "🎨 FCP",  "First Contentful Paint",     "< 1.8 s",  "Time until the first text or image is painted."),
-            ("tbt",  "⏱️ TBT",  "Total Blocking Time",        "< 200 ms", "Proxy for interactivity — time the main thread was blocked."),
-            ("cls",  "📐 CLS",  "Cumulative Layout Shift",    "< 0.1",    "Measures unexpected layout shifts during load."),
-            ("si",   "🏎️ SI",   "Speed Index",                "< 3.4 s",  "How quickly content is visually displayed."),
-            ("ttfb", "🌐 TTFB", "Time to First Byte",         "< 800 ms", "Server response time — how fast the server replies."),
+        _metric_defs = [
+            ("lcp",  "🖼️ LCP",  "Largest Contentful Paint",
+             "< 2.5 s", "Time for the biggest visible image or text block to load."),
+            ("fcp",  "🎨 FCP",  "First Contentful Paint",
+             "< 1.8 s", "Time until the first text or image appears on screen."),
+            ("tbt",  "⏱️ TBT",  "Total Blocking Time",
+             "< 200 ms","Main-thread blocking time — proxy for interactivity."),
+            ("cls",  "📐 CLS",  "Cumulative Layout Shift",
+             "< 0.1",  "Unexpected visual shifts — images/ads jumping around."),
+            ("si",   "🏎️ SI",   "Speed Index",
+             "< 3.4 s", "How quickly content fills the visible page area."),
+            ("ttfb", "🌐 TTFB", "Time to First Byte",
+             "< 800 ms","Server response speed — time until first byte arrives."),
+            ("inp",  "👆 INP",  "Interaction to Next Paint",
+             "< 200 ms","Responsiveness to clicks/taps (replaces FID)."),
         ]
 
-        cols = st.columns(3)
-        for idx, (key, icon_lbl, full_name, threshold, desc) in enumerate(_lab_defs):
-            m = lab.get(key, {})
-            disp  = m.get("display", "—")
-            clr   = m.get("color", "#94A3B8")
-            rating = m.get("rating", "unknown")
-            badge_map = {"good": "✅ Good", "needs-improvement": "⚠️ Needs Improvement",
-                         "poor": "❌ Poor", "unknown": "— N/A"}
-            badge = badge_map.get(rating, "—")
-            with cols[idx % 3]:
+        _mcols = st.columns(3)
+        for _idx, (_key, _ilbl, _fname, _tgt, _desc) in enumerate(_metric_defs):
+            _m = _psi.get(_key, {})
+            _disp  = _m.get("value", "—")
+            _score = _m.get("score")
+            _clr   = _sc(_score)
+            with _mcols[_idx % 3]:
                 st.markdown(f"""
                 <div style='background:var(--seo-card-bg,#fff);
                      border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                     border-top:4px solid {clr};border-radius:10px;
+                     border-top:4px solid {_clr};border-radius:10px;
                      padding:14px 14px 10px;margin-bottom:12px'>
                     <div style='font-size:.72rem;color:var(--seo-muted,#64748B);
-                         font-weight:600;letter-spacing:.04em;text-transform:uppercase'>
-                        {icon_lbl}</div>
-                    <div style='font-size:1.6rem;font-weight:800;color:{clr};
-                         margin:6px 0 2px'>{disp}</div>
-                    <div style='font-size:.72rem;font-weight:700;color:{clr}'>{badge}</div>
+                         font-weight:600;letter-spacing:.04em;text-transform:uppercase'>{_ilbl}</div>
+                    <div style='font-size:1.5rem;font-weight:800;color:{_clr};margin:6px 0 2px'>{_disp}</div>
+                    <div style='font-size:.72rem;font-weight:700;color:{_clr}'>{_badge(_score)}</div>
                     <div style='font-size:.68rem;color:var(--seo-muted,#64748B);
-                         margin-top:6px;line-height:1.5'>
-                        {desc}<br>
-                        <b>Target:</b> {threshold}
-                    </div>
+                         margin-top:6px;line-height:1.5'>{_desc}<br><b>Target:</b> {_tgt}</div>
                 </div>""", unsafe_allow_html=True)
 
-    # ─────────────────────────── FIELD DATA ──────────────────────────────────
-    with tab_field:
-        if not has_field:
-            st.warning(
-                "No real-user (CrUX) field data available for this URL. "
-                "Google only shows field data for pages with enough traffic in Chrome User Experience Report. "
-                "Low-traffic pages or new pages will show lab data only.")
-        else:
-            st.markdown(
-                "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
-                "Real-user data from the Chrome User Experience Report (CrUX) — "
-                "75th percentile of actual visitors.</div>",
-                unsafe_allow_html=True)
-
-            _field_defs = [
-                ("lcp", "🖼️ LCP",  "Largest Contentful Paint", "< 2.5 s",
-                 "The LCP marks when the largest content element is visible."),
-                ("cls", "📐 CLS",  "Cumulative Layout Shift",   "< 0.1",
-                 "Unexpected visual instability — lower is better."),
-                ("inp", "👆 INP",  "Interaction to Next Paint", "< 200 ms",
-                 "Responsiveness to user interactions (replaces FID)."),
-                ("fcp", "🎨 FCP",  "First Contentful Paint",    "< 1.8 s",
-                 "Time until first content appears for real users."),
-            ]
-
-            fcols = st.columns(4)
-            for idx, (key, icon_lbl, full_name, threshold, desc) in enumerate(_field_defs):
-                m   = fld.get(key, {})
-                disp  = m.get("display", "No data")
-                clr   = m.get("color", "#94A3B8")
-                rating = m.get("rating", "unknown")
-                badge_map = {"good": "✅ Good", "needs-improvement": "⚠️ Needs Improvement",
-                             "poor": "❌ Poor", "unknown": "— No data"}
-                badge = badge_map.get(rating, "— No data")
-                with fcols[idx]:
-                    st.markdown(f"""
-                    <div style='background:var(--seo-card-bg,#fff);
-                         border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                         border-top:4px solid {clr};border-radius:10px;
-                         padding:14px 14px 10px'>
-                        <div style='font-size:.72rem;color:var(--seo-muted,#64748B);
-                             font-weight:600;letter-spacing:.04em;text-transform:uppercase'>
-                            {icon_lbl}</div>
-                        <div style='font-size:1.6rem;font-weight:800;color:{clr};
-                             margin:6px 0 2px'>{disp}</div>
-                        <div style='font-size:.72rem;font-weight:700;color:{clr}'>{badge}</div>
-                        <div style='font-size:.68rem;color:var(--seo-muted,#64748B);
-                             margin-top:6px;line-height:1.5'>
-                            {desc}<br><b>Target:</b> {threshold}
-                        </div>
-                    </div>""", unsafe_allow_html=True)
-
-            # CWV bar chart
-            st.markdown("<br>", unsafe_allow_html=True)
-            _bar_labels, _bar_vals, _bar_clrs = [], [], []
-            for key, icon_lbl, *_ in _field_defs:
-                m = fld.get(key, {})
-                if m.get("value") is not None:
-                    _bar_labels.append(icon_lbl)
-                    _bar_vals.append(round(m["value"], 3))
-                    _bar_clrs.append(m.get("color", "#94A3B8"))
-            if _bar_vals:
-                fig_bar = go.Figure(go.Bar(
-                    x=_bar_labels, y=_bar_vals,
-                    marker_color=_bar_clrs, text=_bar_vals,
-                    textposition="outside",
-                ))
-                fig_bar.update_layout(
-                    height=280, margin=dict(t=20, b=5, l=5, r=5),
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    yaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.15)"),
-                    showlegend=False,
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-    # ─────────────────────────── OPPORTUNITIES ───────────────────────────────
+    # ── OPPORTUNITIES TAB ─────────────────────────────────────────────────────
     with tab_opps:
-        if not opps:
-            st.success("✅ No significant performance opportunities found.")
+        _opps = _psi.get("opportunities", [])
+        if not _opps:
+            st.success("✅ No significant performance opportunities found — great job!")
         else:
             st.markdown(
                 f"<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
-                f"<b>{len(opps)}</b> opportunities to improve performance — ordered by potential time saving.</div>",
+                f"<b>{len(_opps)}</b> opportunities identified by Lighthouse — fix these to improve scores.</div>",
                 unsafe_allow_html=True)
-            sev_order = {"good": 2, "needs-improvement": 1, "poor": 0}
-            for opp in opps:
-                score  = opp.get("score", 0)
-                clr    = "#EF4444" if score < 0.5 else "#F59E0B"
-                sav    = opp.get("savings_ms", 0)
-                sav_s  = f" — saves ~{int(sav)} ms" if sav > 0 else ""
-                desc   = opp.get("description", "")
-                # Strip markdown link syntax from description
-                import re as _re
-                desc = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', desc)
+            for _opp in _opps:
+                _s   = _opp.get("score", 0) or 0
+                _clr = "#EF4444" if _s < 0.5 else "#F59E0B"
+                _dv  = _opp.get("displayValue", "")
+                _sav = f" — {_dv}" if _dv else ""
+                _desc = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', _opp.get("description", ""))
                 st.markdown(f"""
                 <div style='background:var(--seo-card-bg,#fff);
-                     border-left:5px solid {clr};border-radius:0 10px 10px 0;
+                     border-left:5px solid {_clr};border-radius:0 10px 10px 0;
                      border:1px solid var(--seo-border,rgba(148,163,184,.22));
                      padding:12px 16px;margin-bottom:8px'>
                     <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
-                        <span style='background:{clr};color:#fff;padding:2px 10px;
+                        <span style='background:{_clr};color:#fff;padding:2px 10px;
                               border-radius:999px;font-size:.7rem;font-weight:700'>
-                            {"High" if score < 0.5 else "Medium"}</span>
+                            {"High" if _s < 0.5 else "Medium"}</span>
                         <b style='font-size:.85rem;color:var(--seo-heading,#0F172A)'>
-                            {opp.get("title","")}</b>
+                            {_opp.get("title","")}</b>
                         <span style='margin-left:auto;font-size:.75rem;
-                              color:{clr};font-weight:700'>{sav_s}</span>
+                              color:{_clr};font-weight:700'>{_sav}</span>
                     </div>
                     <div style='font-size:.78rem;color:var(--seo-muted,#64748B)'>
-                        {desc[:280]}{"…" if len(desc) > 280 else ""}</div>
+                        {_desc[:300]}{"…" if len(_desc) > 300 else ""}</div>
                 </div>""", unsafe_allow_html=True)
-
-        # Diagnostics
-        diags = cwv.get("diagnostics", [])
-        if diags:
-            with st.expander(f"🔍 Diagnostics ({len(diags)} items)"):
-                for d in diags:
-                    score = d.get("score", 1)
-                    clr   = "#F59E0B" if score < 0.9 else "#94A3B8"
-                    st.markdown(f"""
-                    <div style='border-left:3px solid {clr};padding:8px 12px;
-                         margin-bottom:6px;font-size:.8rem'>
-                        <b style='color:var(--seo-heading,#0F172A)'>{d.get("title","")}</b>
-                    </div>""", unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -4140,7 +4058,8 @@ def page_settings():
                 st.info("API key cleared.")
 
     if _current_key:
-        masked = _current_key[:6] + "•" * (len(_current_key) - 10) + _current_key[-4:]
+        _mid = max(0, len(_current_key) - 10)
+        masked = _current_key[:6] + "•" * _mid + _current_key[-4:] if len(_current_key) > 10 else "•" * len(_current_key)
         st.markdown(f"""
         <div style='background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);
              border-radius:8px;padding:10px 14px;margin-top:6px;display:flex;align-items:center;gap:10px'>
@@ -4194,6 +4113,10 @@ def page_settings():
     </div>""", unsafe_allow_html=True)
 
     # ── Session info ───────────────────────────────────────────────────────
+    try:
+        _secrets_psi_set = bool(st.secrets.get("PSI_API_KEY", ""))
+    except Exception:
+        _secrets_psi_set = False
     st.markdown('<div class="section-header">ℹ️ Session Info</div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div style='background:var(--seo-card-bg,#fff);border:1px solid var(--seo-border,rgba(148,163,184,.22));
@@ -4201,8 +4124,7 @@ def page_settings():
         <b>Audited URLs in session:</b> {len(st.session_state.get("audit_results", []))}<br>
         <b>PSI Key in session:</b> {"✅ Set" if st.session_state.get("psi_api_key_global") else "❌ Not set"}<br>
         <b>PSI Key from Streamlit secrets:</b>
-        {"✅ Loaded" if (lambda: __import__("contextlib").suppress(Exception) and
-            bool(st.secrets.get("PSI_API_KEY", "")))() else "—"}
+        {"✅ Loaded" if _secrets_psi_set else "—"}
     </div>""", unsafe_allow_html=True)
     if st.button("🗑️ Clear all audit data from session", type="secondary"):
         st.session_state["audit_results"] = []
