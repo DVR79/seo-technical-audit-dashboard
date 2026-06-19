@@ -1594,7 +1594,7 @@ def page_results():
             "noindex":         "🚫 Showing Noindex URLs",
             "has_redirect":    "↪️ Showing URLs with Redirects",
         }
-        st.info(_label_map.get(_nf, f"Filter: {_nf}") + "  ·  [Clear filter](#)", unsafe_allow_html=False)
+        st.info(_label_map.get(_nf, f"Filter: {_nf}"))
         col_clr, _ = st.columns([1, 5])
         if col_clr.button("✕ Clear Filter", key="clr_nav_filter"):
             st.session_state["nav_filter"] = None
