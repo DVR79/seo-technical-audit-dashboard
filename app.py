@@ -152,11 +152,12 @@ def _rel_badge(is_dofollow, is_nofollow, is_sponsored, is_ugc):
 
 
 def _cwv_color(label):
-    """Shared CWV color helper: returns (bg, fg) tuple."""
     l = label or ""
-    if "Good" in l or l == "Low":     return ("#D1FAE5", "#065F46")
-    if "Needs" in l or l == "Medium": return ("#FEF3C7", "#92400E")
-    return ("#FEE2E2", "#991B1B")
+    if "Good" in l or l == "Low":
+        return ("var(--seo-success-bg,rgba(5,150,105,.13))", "var(--seo-success,#059669)")
+    if "Needs" in l or l == "Medium":
+        return ("var(--seo-warning-bg,rgba(217,119,6,.13))", "var(--seo-warning,#D97706)")
+    return ("var(--seo-error-bg,rgba(220,38,38,.13))", "var(--seo-error,#DC2626)")
 
 
 _SEV_COLORS = {
@@ -579,6 +580,36 @@ def render_inline_result(r):
         k7.metric("Broken",      (il.get("broken_count",0) or 0) + (el_.get("broken_count",0) or 0))
         k8.metric("Schema Types",len(adv.get("schema_types",[])))
 
+        # Heading structure tree
+        hd = r.get("heading_detail", {})
+        if hd.get("tree_html"):
+            st.markdown('<div class="section-header">🏗️ Heading Structure</div>', unsafe_allow_html=True)
+            hcol1, hcol2 = st.columns([2, 1])
+            with hcol1:
+                st.markdown(
+                    f"<div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));"
+                    f"border-radius:10px;padding:14px 18px;max-height:260px;overflow-y:auto'>"
+                    f"{hd['tree_html']}</div>",
+                    unsafe_allow_html=True)
+            with hcol2:
+                cnts = hd.get("counts", {})
+                for lv in range(1, 7):
+                    c = cnts.get(f"h{lv}", 0)
+                    if c:
+                        bar_w = min(c * 12, 100)
+                        st.markdown(
+                            f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:5px'>"
+                            f"<span style='font-size:.72rem;font-weight:700;min-width:24px;color:var(--seo-text,#374151)'>H{lv}</span>"
+                            f"<div style='flex:1;background:var(--seo-border,rgba(148,163,184,.22));border-radius:4px;height:8px'>"
+                            f"<div style='width:{bar_w}%;background:var(--seo-accent,#4F46E5);height:100%;border-radius:4px'></div></div>"
+                            f"<span style='font-size:.72rem;color:var(--seo-muted,#64748B);min-width:16px;text-align:right'>{c}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True)
+                if hd.get("sequence_violations"):
+                    st.warning(f"⚠️ {len(hd['sequence_violations'])} heading level skip(s) detected")
+                if hd.get("empty_headings"):
+                    st.warning(f"⚠️ {len(hd['empty_headings'])} empty heading(s) found")
+
         st.markdown("<br>", unsafe_allow_html=True)
         left, right = st.columns([3, 2])
 
@@ -648,7 +679,7 @@ def render_inline_result(r):
                         <span style='font-size:.75rem;color:#F59E0B'>Redirects: <b>{il_blk}</b></span>
                     </div>
                     <div style='margin-top:6px'>
-                        {"<span style='background:#FEE2E2;color:#991B1B;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(bi) + " Broken</span>" if bi else "<span style='background:#D1FAE5;color:#065F46;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken Links</span>"}
+                        {"<span style='background:var(--seo-error-bg,rgba(220,38,38,.12));color:var(--seo-error,#DC2626);padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(bi) + " Broken</span>" if bi else "<span style='background:var(--seo-success-bg,rgba(5,150,105,.12));color:var(--seo-success,#059669);padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken Links</span>"}
                     </div>
                 </div>""", unsafe_allow_html=True)
             with lc2:
@@ -668,8 +699,8 @@ def render_inline_result(r):
                         <span style='font-size:.75rem;color:var(--seo-text,#374151)'>Domains: <b>{el_dom}</b></span>
                     </div>
                     <div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap'>
-                        {"<span style='background:#FEE2E2;color:#991B1B;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(be) + " Broken</span>" if be else "<span style='background:#D1FAE5;color:#065F46;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken</span>"}
-                        {"<span style='background:#EDE9FE;color:#5B21B6;padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🚫 " + str(blk_cnt) + " Blocked</span>" if blk_cnt else ""}
+                        {"<span style='background:var(--seo-error-bg,rgba(220,38,38,.12));color:var(--seo-error,#DC2626);padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🔴 " + str(be) + " Broken</span>" if be else "<span style='background:var(--seo-success-bg,rgba(5,150,105,.12));color:var(--seo-success,#059669);padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>✅ No Broken</span>"}
+                        {"<span style='background:var(--seo-accent-light,rgba(79,70,229,.12));color:var(--seo-accent,#4F46E5);padding:3px 8px;border-radius:5px;font-size:.78rem;font-weight:700'>🚫 " + str(blk_cnt) + " Blocked</span>" if blk_cnt else ""}
                     </div>
                 </div>""", unsafe_allow_html=True)
 
@@ -1781,6 +1812,45 @@ def page_url_detail():
         h4t.metric("H4", head.get("h4_count",0))
         if head.get("h1_texts"):
             st.caption(f"H1: {' | '.join(head['h1_texts'][:3])}")
+
+        # Heading structure tree
+        hd = r.get("heading_detail", {})
+        if hd.get("tree_html"):
+            st.markdown('<div class="section-header">🏗️ Heading Structure</div>', unsafe_allow_html=True)
+            ht_l, ht_r = st.columns([2, 1])
+            with ht_l:
+                st.markdown(
+                    f"<div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));"
+                    f"border-radius:10px;padding:14px 18px;max-height:300px;overflow-y:auto'>"
+                    f"{hd['tree_html']}</div>",
+                    unsafe_allow_html=True)
+            with ht_r:
+                cnts = hd.get("counts", {})
+                for lv in range(1, 7):
+                    c = cnts.get(f"h{lv}", 0)
+                    if c:
+                        bar_w = min(c * 12, 100)
+                        st.markdown(
+                            f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:5px'>"
+                            f"<span style='font-size:.72rem;font-weight:700;min-width:24px;color:var(--seo-text,#374151)'>H{lv}</span>"
+                            f"<div style='flex:1;background:var(--seo-border,rgba(148,163,184,.22));border-radius:4px;height:8px'>"
+                            f"<div style='width:{bar_w}%;background:var(--seo-accent,#4F46E5);height:100%;border-radius:4px'></div></div>"
+                            f"<span style='font-size:.72rem;color:var(--seo-muted,#64748B);min-width:16px;text-align:right'>{c}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True)
+                kw_cov = hd.get("keyword_coverage", {})
+                if kw_cov:
+                    found = sum(1 for v in kw_cov.values() if v)
+                    total_kw = len(kw_cov)
+                    kw_color = "var(--seo-success,#059669)" if found == total_kw else "var(--seo-warning,#D97706)"
+                    st.markdown(
+                        f"<div style='margin-top:10px;font-size:.75rem;color:var(--seo-muted,#64748B)'>Keyword Coverage: "
+                        f"<span style='color:{kw_color};font-weight:700'>{found}/{total_kw}</span> title keywords in H1/H2</div>",
+                        unsafe_allow_html=True)
+                if hd.get("sequence_violations"):
+                    st.warning(f"⚠️ {len(hd['sequence_violations'])} heading level skip(s)")
+                if hd.get("empty_headings"):
+                    st.warning(f"⚠️ {len(hd['empty_headings'])} empty heading(s)")
 
     # Tab 1 — SERP & Social
     with tabs[1]:

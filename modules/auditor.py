@@ -557,7 +557,9 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
         result["blog_audit"] = audit_blog_page(soup, url)
 
     all_issues = []
-    for key in ["metadata", "headings", "canonical", "indexability", "url_structure",
+    # "headings" is intentionally omitted — heading_detail covers the same checks
+    # more thoroughly, and including both would double-count heading issues.
+    for key in ["metadata", "canonical", "indexability", "url_structure",
                 "content", "images", "heading_detail", "image_detail",
                 "advanced", "redirect_analysis",
                 "internal_links", "external_links", "course_audit", "blog_audit"]:
