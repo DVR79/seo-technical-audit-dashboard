@@ -3765,6 +3765,310 @@ def page_heading_analysis():
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Core Web Vitals
+# ════════════════════════════════════════════════════════════════════════════
+
+def page_cwv():
+    from modules.cwv_auditor import fetch_psi, parse_psi, THRESHOLDS, _color, _rating
+
+    st.markdown(
+        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
+        "⚡ Core Web Vitals</h2>",
+        unsafe_allow_html=True,
+    )
+
+    results = st.session_state.audit_results
+    if not results:
+        _no_data_info(); return
+
+    # ── URL selector + strategy picker ───────────────────────────────────────
+    urls = [r.get("url", "") for r in results]
+    c1, c2, c3 = st.columns([4, 2, 2])
+    with c1:
+        sel = st.selectbox("Select URL", range(len(urls)),
+                           format_func=lambda i: urls[i][-100:], key="cwv_url_sel")
+    with c2:
+        strategy = st.selectbox("Device", ["mobile", "desktop"], key="cwv_strategy")
+    with c3:
+        api_key = st.text_input("PSI API Key (optional)", type="password",
+                                key="cwv_api_key",
+                                help="Leave blank for free tier (25 k req/day). "
+                                     "Get a free key at console.cloud.google.com")
+
+    target_url = urls[sel]
+    cache_key  = f"cwv_{sel}_{strategy}"
+
+    # ── Run button ───────────────────────────────────────────────────────────
+    run_col, info_col = st.columns([2, 5])
+    with run_col:
+        run_btn = st.button("⚡ Run CWV Analysis", key="cwv_run_btn",
+                            use_container_width=True)
+    with info_col:
+        if cache_key in st.session_state:
+            _ts = st.session_state[cache_key].get("_fetched_at", "")
+            st.markdown(
+                f"<div style='padding:7px 0;font-size:.78rem;color:var(--seo-muted,#64748B)'>"
+                f"✅ Data loaded &nbsp;|&nbsp; {_ts} &nbsp;|&nbsp; "
+                f"Click <b>Run CWV Analysis</b> to refresh.</div>",
+                unsafe_allow_html=True)
+        else:
+            st.markdown(
+                "<div style='padding:7px 0;font-size:.75rem;color:var(--seo-muted,#64748B)'>"
+                "No data yet — click <b>Run CWV Analysis</b> to fetch from Google PageSpeed Insights.</div>",
+                unsafe_allow_html=True)
+
+    if run_btn:
+        _ph = st.empty()
+        _ph.info(f"Fetching PageSpeed Insights for **{target_url[-70:]}** ({strategy})…")
+        _key = api_key.strip() or None
+        _data, _err = fetch_psi(target_url, strategy=strategy, api_key=_key)
+        if _err or not _data:
+            _ph.error(f"Failed to fetch: {_err or 'No data returned'}")
+            st.stop()
+        _parsed = parse_psi(_data)
+        import datetime as _dt
+        _parsed["_fetched_at"] = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+        st.session_state[cache_key] = _parsed
+        _ph.empty()
+        st.rerun()
+
+    if cache_key not in st.session_state:
+        st.info("Select a URL and click **⚡ Run CWV Analysis** — results appear here instantly.")
+        return
+
+    cwv = st.session_state[cache_key]
+    perf = cwv.get("performance_score", 0)
+    lab  = cwv.get("lab", {})
+    fld  = cwv.get("field", {})
+    opps = cwv.get("opportunities", [])
+    has_field = cwv.get("has_field_data", False)
+
+    # ── Performance score ring ────────────────────────────────────────────────
+    _perf_clr = "#10B981" if perf >= 90 else "#F59E0B" if perf >= 50 else "#EF4444"
+    _perf_lbl = "Good" if perf >= 90 else "Needs Improvement" if perf >= 50 else "Poor"
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    sc1, sc2, sc3 = st.columns([1, 1, 3])
+    with sc1:
+        fig_ring = go.Figure(go.Pie(
+            values=[perf, 100 - perf],
+            hole=0.72,
+            marker_colors=[_perf_clr, "rgba(148,163,184,.12)"],
+            textinfo="none",
+            hoverinfo="skip",
+        ))
+        fig_ring.add_annotation(
+            text=f"<b>{perf}</b>", x=0.5, y=0.55,
+            font=dict(size=32, color=_perf_clr), showarrow=False)
+        fig_ring.add_annotation(
+            text="Performance", x=0.5, y=0.35,
+            font=dict(size=11, color="#64748B"), showarrow=False)
+        fig_ring.update_layout(showlegend=False, height=200,
+                               margin=dict(t=10, b=10, l=10, r=10),
+                               paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_ring, use_container_width=True)
+    with sc2:
+        _strat_icon = "📱" if cwv.get("strategy") == "mobile" else "🖥️"
+        st.markdown(f"""
+        <div style='padding:16px 0'>
+            <div style='font-size:2rem'>{_strat_icon}</div>
+            <div style='font-size:.85rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-top:4px'>
+                {strategy.title()}</div>
+            <div style='margin-top:8px'>
+                <span style='background:{_perf_clr};color:#fff;padding:4px 14px;
+                      border-radius:999px;font-size:.8rem;font-weight:700'>{_perf_lbl}</span>
+            </div>
+            <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:8px'>
+                Source: Google PageSpeed Insights<br>
+                {cwv.get("_fetched_at","")}</div>
+        </div>""", unsafe_allow_html=True)
+    with sc3:
+        st.markdown("""
+        <div style='font-size:.78rem;color:var(--seo-muted,#64748B);padding:12px 0 4px'>
+            <b style='color:var(--seo-heading,#0F172A)'>Score guide:</b>
+            &nbsp;<span style='color:#10B981;font-weight:700'>90–100 Good</span>
+            &nbsp;|&nbsp;<span style='color:#F59E0B;font-weight:700'>50–89 Needs Improvement</span>
+            &nbsp;|&nbsp;<span style='color:#EF4444;font-weight:700'>0–49 Poor</span>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Tab: Lab data / Field data / Opportunities ───────────────────────────
+    tab_lab, tab_field, tab_opps = st.tabs(
+        ["🔬 Lab Data (Lighthouse)", "👥 Field Data (Real Users)", "🛠️ Opportunities"])
+
+    # ─────────────────────────── LAB DATA ────────────────────────────────────
+    with tab_lab:
+        st.markdown(
+            "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
+            "Simulated performance in a controlled lab environment (Lighthouse)."
+            "</div>", unsafe_allow_html=True)
+
+        _lab_defs = [
+            ("lcp",  "🖼️ LCP",  "Largest Contentful Paint",   "< 2.5 s",  "Time for the largest image/text block to load."),
+            ("fcp",  "🎨 FCP",  "First Contentful Paint",     "< 1.8 s",  "Time until the first text or image is painted."),
+            ("tbt",  "⏱️ TBT",  "Total Blocking Time",        "< 200 ms", "Proxy for interactivity — time the main thread was blocked."),
+            ("cls",  "📐 CLS",  "Cumulative Layout Shift",    "< 0.1",    "Measures unexpected layout shifts during load."),
+            ("si",   "🏎️ SI",   "Speed Index",                "< 3.4 s",  "How quickly content is visually displayed."),
+            ("ttfb", "🌐 TTFB", "Time to First Byte",         "< 800 ms", "Server response time — how fast the server replies."),
+        ]
+
+        cols = st.columns(3)
+        for idx, (key, icon_lbl, full_name, threshold, desc) in enumerate(_lab_defs):
+            m = lab.get(key, {})
+            disp  = m.get("display", "—")
+            clr   = m.get("color", "#94A3B8")
+            rating = m.get("rating", "unknown")
+            badge_map = {"good": "✅ Good", "needs-improvement": "⚠️ Needs Improvement",
+                         "poor": "❌ Poor", "unknown": "— N/A"}
+            badge = badge_map.get(rating, "—")
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style='background:var(--seo-card-bg,#fff);
+                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                     border-top:4px solid {clr};border-radius:10px;
+                     padding:14px 14px 10px;margin-bottom:12px'>
+                    <div style='font-size:.72rem;color:var(--seo-muted,#64748B);
+                         font-weight:600;letter-spacing:.04em;text-transform:uppercase'>
+                        {icon_lbl}</div>
+                    <div style='font-size:1.6rem;font-weight:800;color:{clr};
+                         margin:6px 0 2px'>{disp}</div>
+                    <div style='font-size:.72rem;font-weight:700;color:{clr}'>{badge}</div>
+                    <div style='font-size:.68rem;color:var(--seo-muted,#64748B);
+                         margin-top:6px;line-height:1.5'>
+                        {desc}<br>
+                        <b>Target:</b> {threshold}
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+    # ─────────────────────────── FIELD DATA ──────────────────────────────────
+    with tab_field:
+        if not has_field:
+            st.warning(
+                "No real-user (CrUX) field data available for this URL. "
+                "Google only shows field data for pages with enough traffic in Chrome User Experience Report. "
+                "Low-traffic pages or new pages will show lab data only.")
+        else:
+            st.markdown(
+                "<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
+                "Real-user data from the Chrome User Experience Report (CrUX) — "
+                "75th percentile of actual visitors.</div>",
+                unsafe_allow_html=True)
+
+            _field_defs = [
+                ("lcp", "🖼️ LCP",  "Largest Contentful Paint", "< 2.5 s",
+                 "The LCP marks when the largest content element is visible."),
+                ("cls", "📐 CLS",  "Cumulative Layout Shift",   "< 0.1",
+                 "Unexpected visual instability — lower is better."),
+                ("inp", "👆 INP",  "Interaction to Next Paint", "< 200 ms",
+                 "Responsiveness to user interactions (replaces FID)."),
+                ("fcp", "🎨 FCP",  "First Contentful Paint",    "< 1.8 s",
+                 "Time until first content appears for real users."),
+            ]
+
+            fcols = st.columns(4)
+            for idx, (key, icon_lbl, full_name, threshold, desc) in enumerate(_field_defs):
+                m   = fld.get(key, {})
+                disp  = m.get("display", "No data")
+                clr   = m.get("color", "#94A3B8")
+                rating = m.get("rating", "unknown")
+                badge_map = {"good": "✅ Good", "needs-improvement": "⚠️ Needs Improvement",
+                             "poor": "❌ Poor", "unknown": "— No data"}
+                badge = badge_map.get(rating, "— No data")
+                with fcols[idx]:
+                    st.markdown(f"""
+                    <div style='background:var(--seo-card-bg,#fff);
+                         border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                         border-top:4px solid {clr};border-radius:10px;
+                         padding:14px 14px 10px'>
+                        <div style='font-size:.72rem;color:var(--seo-muted,#64748B);
+                             font-weight:600;letter-spacing:.04em;text-transform:uppercase'>
+                            {icon_lbl}</div>
+                        <div style='font-size:1.6rem;font-weight:800;color:{clr};
+                             margin:6px 0 2px'>{disp}</div>
+                        <div style='font-size:.72rem;font-weight:700;color:{clr}'>{badge}</div>
+                        <div style='font-size:.68rem;color:var(--seo-muted,#64748B);
+                             margin-top:6px;line-height:1.5'>
+                            {desc}<br><b>Target:</b> {threshold}
+                        </div>
+                    </div>""", unsafe_allow_html=True)
+
+            # CWV bar chart
+            st.markdown("<br>", unsafe_allow_html=True)
+            _bar_labels, _bar_vals, _bar_clrs = [], [], []
+            for key, icon_lbl, *_ in _field_defs:
+                m = fld.get(key, {})
+                if m.get("value") is not None:
+                    _bar_labels.append(icon_lbl)
+                    _bar_vals.append(round(m["value"], 3))
+                    _bar_clrs.append(m.get("color", "#94A3B8"))
+            if _bar_vals:
+                fig_bar = go.Figure(go.Bar(
+                    x=_bar_labels, y=_bar_vals,
+                    marker_color=_bar_clrs, text=_bar_vals,
+                    textposition="outside",
+                ))
+                fig_bar.update_layout(
+                    height=280, margin=dict(t=20, b=5, l=5, r=5),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    yaxis=dict(showgrid=True, gridcolor="rgba(148,163,184,.15)"),
+                    showlegend=False,
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+    # ─────────────────────────── OPPORTUNITIES ───────────────────────────────
+    with tab_opps:
+        if not opps:
+            st.success("✅ No significant performance opportunities found.")
+        else:
+            st.markdown(
+                f"<div style='font-size:.78rem;color:var(--seo-muted,#64748B);margin-bottom:12px'>"
+                f"<b>{len(opps)}</b> opportunities to improve performance — ordered by potential time saving.</div>",
+                unsafe_allow_html=True)
+            sev_order = {"good": 2, "needs-improvement": 1, "poor": 0}
+            for opp in opps:
+                score  = opp.get("score", 0)
+                clr    = "#EF4444" if score < 0.5 else "#F59E0B"
+                sav    = opp.get("savings_ms", 0)
+                sav_s  = f" — saves ~{int(sav)} ms" if sav > 0 else ""
+                desc   = opp.get("description", "")
+                # Strip markdown link syntax from description
+                import re as _re
+                desc = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', desc)
+                st.markdown(f"""
+                <div style='background:var(--seo-card-bg,#fff);
+                     border-left:5px solid {clr};border-radius:0 10px 10px 0;
+                     border:1px solid var(--seo-border,rgba(148,163,184,.22));
+                     padding:12px 16px;margin-bottom:8px'>
+                    <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>
+                        <span style='background:{clr};color:#fff;padding:2px 10px;
+                              border-radius:999px;font-size:.7rem;font-weight:700'>
+                            {"High" if score < 0.5 else "Medium"}</span>
+                        <b style='font-size:.85rem;color:var(--seo-heading,#0F172A)'>
+                            {opp.get("title","")}</b>
+                        <span style='margin-left:auto;font-size:.75rem;
+                              color:{clr};font-weight:700'>{sav_s}</span>
+                    </div>
+                    <div style='font-size:.78rem;color:var(--seo-muted,#64748B)'>
+                        {desc[:280]}{"…" if len(desc) > 280 else ""}</div>
+                </div>""", unsafe_allow_html=True)
+
+        # Diagnostics
+        diags = cwv.get("diagnostics", [])
+        if diags:
+            with st.expander(f"🔍 Diagnostics ({len(diags)} items)"):
+                for d in diags:
+                    score = d.get("score", 1)
+                    clr   = "#F59E0B" if score < 0.9 else "#94A3B8"
+                    st.markdown(f"""
+                    <div style='border-left:3px solid {clr};padding:8px 12px;
+                         margin-bottom:6px;font-size:.8rem'>
+                        <b style='color:var(--seo-heading,#0F172A)'>{d.get("title","")}</b>
+                    </div>""", unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # Settings
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -3940,6 +4244,7 @@ with st.sidebar:
         "🔗 Link Analysis",
         "📱 Mobile Audit",
         "🖼️ Image SEO",
+        "⚡ Core Web Vitals",
         "📝 Heading Analysis",
         "📤 Export Reports",
         "⚙️ Settings",
@@ -3982,6 +4287,7 @@ elif page == "🔎 URL Detail":         page_url_detail()
 elif page == "🔗 Link Analysis":      page_link_analysis()
 elif page == "📱 Mobile Audit":       page_mobile_audit()
 elif page == "🖼️ Image SEO":          page_image_seo()
+elif page == "⚡ Core Web Vitals":    page_cwv()
 elif page == "📝 Heading Analysis":   page_heading_analysis()
 elif page == "📤 Export Reports":     page_export()
 elif page == "⚙️ Settings":           page_settings()
