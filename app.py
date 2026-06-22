@@ -1139,8 +1139,22 @@ def page_dashboard():
     with c2: st.caption(f"**Total URLs Audited:** {len(results)}")
 
     if not results:
-        st.markdown('<div class="info-box">👆 No audit data yet. Go to <b>New Audit</b> to get started.</div>',
-                    unsafe_allow_html=True)
+        st.markdown("""
+        <div style='background:var(--seo-card-bg,#fff);border:1.5px dashed var(--seo-border,rgba(148,163,184,.4));
+        border-radius:14px;padding:40px 32px;text-align:center;margin:24px 0'>
+          <div style='font-size:2.8rem;margin-bottom:12px'>🚀</div>
+          <div style='font-size:1.25rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-bottom:8px'>
+            Run your first SEO audit</div>
+          <div style='color:var(--seo-muted,#64748B);font-size:.92rem;max-width:480px;margin:0 auto 20px'>
+            Paste a URL in <b>New Audit</b> to get a full technical SEO report — metadata, headings,
+            images, links, PageSpeed, mobile readiness, and more.</div>
+          <div style='display:flex;gap:16px;justify-content:center;flex-wrap:wrap;font-size:.82rem;color:var(--seo-muted,#64748B)'>
+            <span>📋 Single URL audit</span>
+            <span>📂 Bulk CSV / XLSX upload</span>
+            <span>🗺️ Sitemap XML import</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     total  = len(results)
@@ -1588,7 +1602,12 @@ def page_new_audit():
         sm_file = st.file_uploader("Upload sitemap", type=["xml"],
                                    label_visibility="collapsed")
         if sm_file:
-            sm_urls = extract_urls_from_sitemap(sm_file)
+            _SITEMAP_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+            if sm_file.size > _SITEMAP_MAX_BYTES:
+                st.error(f"Sitemap file is too large ({sm_file.size // (1024*1024)} MB). Maximum allowed size is 10 MB.")
+                sm_urls = []
+            else:
+                sm_urls = extract_urls_from_sitemap(sm_file)
             if sm_urls:
                 _SITEMAP_URL_LIMIT = 500
                 if len(sm_urls) > _SITEMAP_URL_LIMIT:

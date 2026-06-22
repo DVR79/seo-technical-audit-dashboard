@@ -9,6 +9,8 @@ Storage hierarchy (highest precedence first):
 """
 
 import json
+import os
+import stat
 import requests
 from pathlib import Path
 

@@ -91,6 +91,7 @@ def fetch_page(url):
             "redirect_history": [r.url for r in resp.history],
             "content_type": resp.headers.get("Content-Type", ""),
             "soup": soup,
+            "html": text,
             "response_time": resp.elapsed.total_seconds(),
             "http_headers": dict(resp.headers),
             "page_size_bytes": len(resp.content),
@@ -109,6 +110,7 @@ def fetch_page(url):
                 "redirect_history": [r.url for r in resp.history],
                 "content_type": resp.headers.get("Content-Type", ""),
                 "soup": soup,
+                "html": text,
                 "response_time": resp.elapsed.total_seconds(),
                 "ssl_warning": True,
                 "http_headers": dict(resp.headers),
@@ -329,10 +331,11 @@ def analyze_url_structure(url, response_time=0.0):
     }
 
 
-def analyze_content(soup):
-    """Analyse content quality. Makes a deep copy so the original soup is not mutated."""
+def analyze_content(soup, html: str = ""):
+    """Analyse content quality. Parses from raw HTML when available to avoid re-serialising soup."""
     issues = []
-    soup_copy = BeautifulSoup(str(soup), "lxml")
+    # Parse a fresh tree from raw HTML so we can decompose tags without mutating the shared soup
+    soup_copy = BeautifulSoup(html or str(soup), "lxml")
     for tag in soup_copy(["script", "style", "nav", "footer", "header", "aside"]):
         tag.decompose()
 
@@ -524,7 +527,7 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
     result["canonical"]    = analyze_canonical(soup, url)
     result["indexability"] = analyze_indexability(soup)
     result["url_structure"] = analyze_url_structure(url, result["response_time"])
-    result["content"]      = analyze_content(soup)
+    result["content"]      = analyze_content(soup, html=fetch.get("html", ""))
     result["images"]       = analyze_images(soup)     # kept for scoring compatibility
     result["redirect_analysis"] = analyze_redirect_chain(result["redirect_chain"])
 
