@@ -137,7 +137,7 @@
 - **Batch 4** (8 items): `[x]` MEDIUM — commit `025877e`
 - **Batch 5** (11 items): `[x]` LOW + Docs — commit `025877e`
 
-**Overall: 45 / 45 fixed**
+**Overall: 45 / 45 fixed + 3 additional improvements**
 
 ---
 
@@ -147,6 +147,11 @@
 
 Key findings from this pass:
 - `blog_auditor.py` had a malformed patch (IndentationError at line 91) — fixed.
+
+**2026-06-22** — Final cleanup commit `ab66208` (pushed to `origin/main`):
+- P4 (performance): `analyze_content()` no longer re-serialises the shared BeautifulSoup tree — raw HTML passed through `fetch_page()` dict and parsed once.
+- S11 (security): Early `sm_file.size` guard on sitemap upload avoids reading oversized files into memory entirely.
+- U8 (UI/UX): Empty-state dashboard replaced with full onboarding card (icon, headline, description, feature pills).
 - Batches 4–5 module fixes existed as uncommitted working-tree changes — committed.
 - Batches 4–5 `app.py` items (S10, S11, L17–L20, U9, P6, DOC2, S13) were marked `[x]`
   but had not been applied to code. All are now fixed and committed.
