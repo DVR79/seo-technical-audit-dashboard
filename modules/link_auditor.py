@@ -638,15 +638,9 @@ def _summarize_external(links):
             "severity": "Medium", "impact_score": 5, "effort": "Low",
             "recommendation": "Add rel='noopener noreferrer' to all external links that open in new tabs (security best practice).",
         })
-    if same_tab > 0:
+    if dofollow > 50:
         issues.append({
-            "issue": f"{same_tab} External Link(s) Open in Same Tab", "category": "External Links",
-            "severity": "Low", "impact_score": 3, "effort": "Low",
-            "recommendation": "Consider opening external links in a new tab (target='_blank' + noopener) to retain visitors.",
-        })
-    if dofollow > 20:
-        issues.append({
-            "issue": f"High Dofollow External Link Count ({dofollow})", "category": "External Links",
+            "issue": f"Very High Dofollow External Link Count ({dofollow})", "category": "External Links",
             "severity": "Warning", "impact_score": 4, "effort": "Medium",
             "recommendation": "Review excessive external dofollow links — add rel='nofollow' for commercial or low-authority destinations.",
         })

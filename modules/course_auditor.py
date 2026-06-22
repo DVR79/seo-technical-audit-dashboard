@@ -44,6 +44,8 @@ def audit_course_page(soup, url):
                 "recommendation": (
                     f"Add a '{section_name}' section to improve page completeness and user confidence."
                 ),
+                "impact_score": 8 if severity == "High" else 5,
+                "effort": "Medium",
             })
 
     # Conversion elements
@@ -60,6 +62,8 @@ def audit_course_page(soup, url):
                 "category": "Conversion",
                 "severity": "High",
                 "recommendation": f"Add a {element_name} to improve lead generation.",
+                "impact_score": 8,
+                "effort": "Medium",
             })
 
     # Schema
@@ -71,6 +75,8 @@ def audit_course_page(soup, url):
             "category": "Structured Data",
             "severity": "Medium",
             "recommendation": "Add Course schema (JSON-LD) to enhance rich results in search.",
+            "impact_score": 6,
+            "effort": "Medium",
         })
 
     sections_score = round(sum(1 for v in sections_found.values() if v) / len(sections_found) * 100, 1)

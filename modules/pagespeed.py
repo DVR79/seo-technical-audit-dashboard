@@ -44,7 +44,7 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
     strategy : str
         "mobile" or "desktop".
     api_key : str, optional
-        Google API key for higher quotas.
+        Google API key. If None, auto-fetched from APIKeyManager (falls back to anonymous).
 
     Returns
     -------
@@ -54,6 +54,13 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
               opportunities, source.
         On failure: success=False, error=str.
     """
+    if api_key is None:
+        try:
+            from modules.api_key_manager import APIKeyManager
+            api_key = APIKeyManager.get("psi") or None
+        except Exception:
+            api_key = None
+
     params = {"url": url, "strategy": strategy, "category": ["performance", "accessibility", "seo", "best-practices"]}
     if api_key:
         params["key"] = api_key

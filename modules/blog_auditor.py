@@ -87,6 +87,8 @@ def audit_blog_page(soup, url):
             "category": "Structured Data",
             "severity": "Medium",
             "recommendation": "Add BlogPosting schema (JSON-LD) to enhance rich snippets.",
+            "impact_score": 5,
+            "effort": "Medium",
         })
 
     # Open Graph

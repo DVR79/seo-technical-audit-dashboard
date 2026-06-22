@@ -632,9 +632,10 @@ def analyze_mobile(soup, base_url="", technical_seo=None, advanced_data=None, pa
         _check_content_wider_screen(soup),
     ]
 
-    # Compute score: pass + info count / total
-    passed_checks = sum(1 for c in raw_checks if c["status"] in ("pass", "info"))
-    total_checks = len(raw_checks)
+    # Compute score: only count definitive passes (not "info" — inconclusive checks)
+    decisive_checks = [c for c in raw_checks if c["status"] != "info"]
+    passed_checks = sum(1 for c in decisive_checks if c["status"] == "pass")
+    total_checks = len(decisive_checks)
     mobile_score = round((passed_checks / total_checks) * 100) if total_checks > 0 else 0
 
     # Determine mobile friendly: no Critical or High issues

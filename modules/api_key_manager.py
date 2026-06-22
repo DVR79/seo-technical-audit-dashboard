@@ -230,6 +230,11 @@ class APIKeyManager:
         try:
             _KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
             _KEYS_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+            import os, stat
+            try:
+                os.chmod(_KEYS_FILE, stat.S_IRUSR | stat.S_IWUSR)  # 0o600 on POSIX
+            except (OSError, NotImplementedError):
+                pass  # chmod is a no-op on Windows; file is protected by user directory ACLs
         except Exception:
             pass
 

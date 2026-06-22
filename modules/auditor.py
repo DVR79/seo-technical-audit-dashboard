@@ -52,7 +52,7 @@ TIMEOUT = 20
 MAX_TITLE_LEN   = 60
 MIN_TITLE_LEN   = 30
 MAX_DESC_LEN    = 160
-MIN_DESC_LEN    = 120
+MIN_DESC_LEN    = 150
 THIN_THRESHOLD  = 300
 SLOW_THRESHOLD  = 3.0   # seconds
 
@@ -152,7 +152,7 @@ def analyze_metadata(soup, url):
 
     if not description:
         issues.append(_issue("Missing Meta Description", "Metadata", "Critical",
-            "Add a compelling meta description (120–160 chars) with a clear call to action.",
+            "Add a compelling meta description (150–160 chars) with a clear call to action.",
             impact_score=9, effort="Low"))
     elif desc_len < MIN_DESC_LEN:
         issues.append(_issue(f"Meta Description Too Short ({desc_len} chars)", "Metadata", "Warning",
@@ -323,11 +323,6 @@ def analyze_url_structure(url, response_time=0.0):
             "Migrate to HTTPS. Google uses HTTPS as a ranking signal and it's required for trust.",
             impact_score=9, effort="High"))
 
-    if response_time > SLOW_THRESHOLD:
-        issues.append(_issue(f"Slow Server Response ({response_time:.2f}s)", "Performance", "High",
-            "Aim for under 200ms TTFB. Optimise server, enable caching, and use a CDN.",
-            impact_score=7, effort="High"))
-
     return {
         "length": url_len, "slug": slug, "path": path,
         "is_https": parsed.scheme == "https", "issues": issues,
@@ -342,8 +337,8 @@ def analyze_content(soup):
         tag.decompose()
 
     text = soup_copy.get_text(separator=" ")
-    # Only count alphabetic words (exclude numbers, punctuation)
-    words = re.findall(r"[a-zA-Z]{2,}", text)
+    # Count all tokens of 2+ non-whitespace chars — supports multilingual content
+    words = [w for w in text.split() if len(w) >= 2]
     word_count   = len(words)
     reading_time = round(word_count / 200, 1)
 
@@ -520,6 +515,7 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
     result["redirect_count"] = fetch.get("redirect_count", 0)
     result["redirect_chain"] = fetch.get("redirect_history", [])
     result["final_url"]      = fetch.get("final_url", url)
+    result["ssl_warning"]    = fetch.get("ssl_warning", False)
 
     soup = fetch["soup"]
 

@@ -49,8 +49,12 @@ def analyze_http_headers(http_headers: dict, url: str) -> dict:
     # Content-Encoding / Compression
     content_encoding = h.get("content-encoding", "identity")
     has_compression = content_encoding.lower() in ("gzip", "br", "deflate", "zstd")
+    # CDN-served cached responses may omit Content-Encoding — check Vary and CF headers
+    vary_header = h.get("vary", "").lower()
+    cdn_hit = h.get("cf-cache-status", "").upper() in ("HIT", "REVALIDATED")
+    cdn_compress_likely = "accept-encoding" in vary_header or cdn_hit
 
-    if not has_compression:
+    if not has_compression and not cdn_compress_likely:
         issues.append({
             "issue": "Response Not Compressed (No gzip/Brotli)",
             "category": "Performance",
@@ -578,9 +582,9 @@ def analyze_advanced(soup, url, http_headers=None, page_size_bytes=0, response_t
         issues.append({
             "issue": "No Structured Data Found",
             "category": "Structured Data",
-            "severity": "Medium",
-            "recommendation": "Add relevant JSON-LD schema markup (Article, Course, FAQPage, BreadcrumbList) for rich results.",
-            "impact_score": 6,
+            "severity": "Low",
+            "recommendation": "Consider adding JSON-LD schema markup (Article, FAQPage, BreadcrumbList) if applicable. Not all page types require structured data.",
+            "impact_score": 4,
             "effort": "Medium",
         })
     else:
@@ -621,7 +625,7 @@ def analyze_advanced(soup, url, http_headers=None, page_size_bytes=0, response_t
     breadcrumb_parts = [parsed.netloc] + path_parts
     breadcrumb_str = " › ".join(breadcrumb_parts)[:80]
 
-    serp_title_display = page_title[:57] + "..." if len(page_title) > 57 else page_title
+    serp_title_display = page_title[:60] + "..." if len(page_title) > 60 else page_title
     serp_desc_display  = page_desc[:157]  + "..." if len(page_desc)  > 157 else page_desc
 
     # ── 9. Social / OG preview data ───────────────────────────────────────

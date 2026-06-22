@@ -15,6 +15,7 @@ import streamlit as st
 
 from modules.image_auditor import _fetch_size
 from modules.api_key_manager import APIKeyManager, CATEGORIES, _API_FLAT, test_api_key
+from modules.report_generator import _score_label as _score_label
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -86,11 +87,6 @@ def _score_color(s):
     if s >= 50: return "#F59E0B"
     return "#EF4444"
 
-def _score_label(s):
-    if s >= 90: return "Excellent"
-    if s >= 75: return "Good"
-    if s >= 50: return "Needs Attention"
-    return "Critical"
 
 def _score_class(s):
     if s >= 90: return "score-excellent"
@@ -361,9 +357,15 @@ def extract_urls_from_csv_xlsx(uploaded_file):
         return [], ""
 
 
+_SITEMAP_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 def extract_urls_from_sitemap(uploaded_file):
     try:
         content = uploaded_file.read()
+        if len(content) > _SITEMAP_MAX_BYTES:
+            st.error(f"Sitemap file is too large ({len(content) // (1024*1024)} MB). Maximum allowed size is 10 MB.")
+            return []
         root = ET.fromstring(content)
         ns   = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         urls = [loc.text.strip() for loc in root.findall(".//sm:loc", ns) if loc.text]
@@ -568,6 +570,9 @@ def render_inline_result(r):
             </div>
         </div>
     </div>""", unsafe_allow_html=True)
+
+    if r.get("ssl_warning"):
+        st.warning("⚠️ TLS/SSL certificate could not be verified for this URL. The audit continued with certificate validation disabled — treat results with caution.")
 
     # ── Tabs ──────────────────────────────────────────────────────────────
     tabs = st.tabs([
@@ -778,7 +783,6 @@ def render_inline_result(r):
                 ("Schema",       adv.get("has_schema", False)),
                 ("Twitter Cards",adv.get("twitter_complete", False)),
                 ("Favicon",      adv.get("has_favicon", False)),
-                ("AMP",          adv.get("has_amp", False)),
             ],
             [
                 ("OG Tags",      meta.get("has_og_tags", False)),
@@ -1029,7 +1033,7 @@ def render_inline_result(r):
         with amp_col:
             st.markdown("**AMP**")
             if _tech.get("has_amp"):
-                st.success(f"✅ AMP version detected")
+                st.info(f"AMP version detected (Google deprecated AMP as a ranking factor in 2021)")
                 if _tech.get("amp_url"):
                     st.caption(f"AMP URL: {_tech['amp_url']}")
             else:
@@ -1557,6 +1561,10 @@ def page_new_audit():
         if bulk_file:
             urls, detected_col = extract_urls_from_csv_xlsx(bulk_file)
             if urls:
+                _BULK_URL_LIMIT = 500
+                if len(urls) > _BULK_URL_LIMIT:
+                    st.warning(f"File contains {len(urls)} URLs — only the first {_BULK_URL_LIMIT} will be audited.")
+                    urls = urls[:_BULK_URL_LIMIT]
                 st.success(f"Found **{len(urls)}** valid URLs in column '**{detected_col}**'")
                 with st.expander("Preview URLs"):
                     st.dataframe(pd.DataFrame({"URL": urls[:20]}), use_container_width=True)
@@ -1582,6 +1590,10 @@ def page_new_audit():
         if sm_file:
             sm_urls = extract_urls_from_sitemap(sm_file)
             if sm_urls:
+                _SITEMAP_URL_LIMIT = 500
+                if len(sm_urls) > _SITEMAP_URL_LIMIT:
+                    st.warning(f"Sitemap contains {len(sm_urls)} URLs — only the first {_SITEMAP_URL_LIMIT} will be available.")
+                    sm_urls = sm_urls[:_SITEMAP_URL_LIMIT]
                 st.success(f"Extracted **{len(sm_urls)}** URLs.")
                 select_all = st.checkbox("Select All URLs", value=True)
                 chosen = sm_urls if select_all else st.multiselect(
@@ -2061,7 +2073,7 @@ def page_url_detail():
         with ac:
             st.markdown("**AMP**")
             if _t.get("has_amp"):
-                st.success("✅ AMP version detected")
+                st.info("AMP version detected (Google deprecated AMP as a ranking factor in 2021)")
                 if _t.get("amp_url"):
                     st.caption(f"AMP URL: {_t['amp_url']}")
             else:
