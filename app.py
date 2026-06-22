@@ -1550,7 +1550,7 @@ def page_new_audit():
             elif not single_url.strip().startswith("http"):
                 st.warning("URL must start with http:// or https://")
             else:
-                spinner_msg = f"Auditing {single_url} …" + (" + PageSpeed Insights (15s)" if fetch_psi else "")
+                spinner_msg = f"Auditing {single_url} …" + (" + PageSpeed Insights (30–90s)" if fetch_psi else "")
                 with st.spinner(spinner_msg):
                     result = audit_url(single_url.strip(), atype, check_links, validate_links,
                                        fetch_pagespeed=fetch_psi, psi_api_key=psi_api_key or None)
@@ -3167,7 +3167,7 @@ def _page_mobile_audit_body():
                 if not _final_key:
                     st.error("Paste your Google API key before fetching. Anonymous requests are blocked on Streamlit Cloud.")
                 else:
-                    with st.spinner("Calling PageSpeed Insights API (~15s) …"):
+                    with st.spinner("Calling PageSpeed Insights API — Google renders the full page remotely, takes 30–90s …"):
                         from modules.pagespeed import fetch_pagespeed as _fetch_psi_live
                         _result = _fetch_psi_live(current_url, strategy="mobile", api_key=_final_key)
                     if _result.get("success"):

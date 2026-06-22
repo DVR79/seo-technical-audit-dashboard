@@ -9,7 +9,8 @@ Provide an API key for higher quotas (25 000 req/day).
 import requests
 
 PSI_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-PSI_TIMEOUT  = 60  # PSI itself fetches the page, so allow a generous timeout
+PSI_TIMEOUT  = 90   # PSI fetches and renders the target page — needs extra headroom
+PSI_RETRIES  = 2    # retry on timeout before giving up
 
 
 def _score_to_status(score):
@@ -65,27 +66,36 @@ def fetch_pagespeed(url, strategy="mobile", api_key=None):
     if api_key:
         params["key"] = api_key
 
-    try:
-        resp = requests.get(PSI_ENDPOINT, params=params, timeout=PSI_TIMEOUT)
-        if resp.status_code == 429:
-            return {
-                "success": False,
-                "error_code": 429,
-                "error": (
-                    "Rate limit reached for anonymous PSI requests. "
-                    "Add a free Google API key to get 25,000 requests/day."
-                ),
-            }
-        if resp.status_code == 400:
-            return {"success": False, "error_code": 400,
-                    "error": "Invalid URL or request rejected by PageSpeed Insights."}
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.exceptions.Timeout:
-        return {"success": False, "error_code": 0,
-                "error": "PageSpeed Insights request timed out (60s). Try again."}
-    except Exception as e:
-        return {"success": False, "error_code": 0, "error": str(e)}
+    last_error = "Unknown error"
+    for attempt in range(1, PSI_RETRIES + 1):
+        try:
+            resp = requests.get(PSI_ENDPOINT, params=params, timeout=PSI_TIMEOUT)
+            if resp.status_code == 429:
+                return {
+                    "success": False,
+                    "error_code": 429,
+                    "error": (
+                        "Rate limit reached for anonymous PSI requests. "
+                        "Add a free Google API key to get 25,000 requests/day."
+                    ),
+                }
+            if resp.status_code == 400:
+                return {"success": False, "error_code": 400,
+                        "error": "Invalid URL or request rejected by PageSpeed Insights."}
+            resp.raise_for_status()
+            data = resp.json()
+            break  # success — exit retry loop
+        except requests.exceptions.Timeout:
+            last_error = f"PageSpeed Insights request timed out ({PSI_TIMEOUT}s) on attempt {attempt}/{PSI_RETRIES}."
+            if attempt == PSI_RETRIES:
+                return {"success": False, "error_code": 0,
+                        "error": f"PageSpeed Insights timed out after {PSI_RETRIES} attempts ({PSI_TIMEOUT}s each). "
+                                 f"Google's servers may be slow — try again in a moment."}
+            continue  # retry
+        except Exception as e:
+            return {"success": False, "error_code": 0, "error": str(e)}
+    else:
+        return {"success": False, "error_code": 0, "error": last_error}
 
     lhr    = data.get("lighthouseResult", {})
     cats   = lhr.get("categories", {})
