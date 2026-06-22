@@ -131,10 +131,28 @@
 
 ## Fix Progress
 
-- **Batch 1** (7 items): `[ ]` CRITICAL Security + Logic  
-- **Batch 2** (11 items): `[ ]` HIGH Security + Logic  
-- **Batch 3** (8 items): `[ ]` HIGH UI/UX + Perf  
-- **Batch 4** (8 items): `[ ]` MEDIUM  
-- **Batch 5** (11 items): `[ ]` LOW + Docs  
+- **Batch 1** (7 items): `[x]` CRITICAL Security + Logic — commit `d51929e`
+- **Batch 2** (11 items): `[x]` HIGH Security + Logic — commit `909b104`
+- **Batch 3** (8 items): `[x]` HIGH UI/UX + Perf — commit `3317a8c`
+- **Batch 4** (8 items): `[x]` MEDIUM — commit `025877e`
+- **Batch 5** (11 items): `[x]` LOW + Docs — commit `025877e`
 
-**Overall: 0 / 45 fixed**
+**Overall: 45 / 45 fixed**
+
+---
+
+## Completion Notes
+
+**2026-06-22** — Scheduled check run. All 45 audit items verified complete.
+
+Key findings from this pass:
+- `blog_auditor.py` had a malformed patch (IndentationError at line 91) — fixed.
+- Batches 4–5 module fixes existed as uncommitted working-tree changes — committed.
+- Batches 4–5 `app.py` items (S10, S11, L17–L20, U9, P6, DOC2, S13) were marked `[x]`
+  but had not been applied to code. All are now fixed and committed.
+- `ssl_warning` is now propagated through the audit result and shown as a UI warning banner.
+- AMP removed from the ✅ signal checklist (deprecated by Google since 2021).
+- `_score_label` deduplicated: lives only in `report_generator.py`, imported in `app.py`.
+- `PREPUSH_CHECKLIST.md` created with syntax checks, security reminders, and git hygiene steps.
+
+App syntax verified clean across all 14 Python files. Branch is ahead of origin/main by 4 commits; push when ready.
