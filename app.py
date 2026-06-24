@@ -540,32 +540,32 @@ def render_inline_result(r):
 
     # ── Score banner ──────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style='background:var(--seo-banner-bg,linear-gradient(135deg,#0F172A,#1E293B));border-radius:14px;
+    <div style='background:linear-gradient(135deg,#EEF2FF 0%,#F5F3FF 50%,#FAF5FF 100%);border-radius:14px;
     padding:20px 28px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;
-    border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
+    border:1px solid rgba(79,70,229,0.15)'>
         <div style='text-align:center;min-width:90px'>
             <div style='font-size:3rem;font-weight:800;color:{color};line-height:1'>{score}</div>
-            <div style='font-size:.78rem;color:var(--seo-banner-muted,#94A3B8);margin-top:2px'>SEO Score / 100</div>
+            <div style='font-size:.78rem;color:#6B7280;margin-top:2px'>SEO Score / 100</div>
             <div style='margin-top:6px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
         </div>
         <div style='flex:1;min-width:200px'>
-            <div style='font-size:.95rem;font-weight:700;color:var(--seo-banner-text,#F1F5F9);margin-bottom:6px;word-break:break-all'>
+            <div style='font-size:.95rem;font-weight:700;color:#0F172A;margin-bottom:6px;word-break:break-all'>
                 {r.get("url","")[:100]}
             </div>
-            <div style='font-size:.8rem;color:var(--seo-banner-muted,#94A3B8)'>
-                Type: <b style='color:var(--seo-banner-label,#CBD5E1)'>{atype.title()}</b> &nbsp;|&nbsp;
-                HTTP: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
-                Response: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
-                Redirects: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("redirect_count",0)}</b>
+            <div style='font-size:.8rem;color:#6B7280'>
+                Type: <b style='color:#374151'>{atype.title()}</b> &nbsp;|&nbsp;
+                HTTP: <b style='color:#374151'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
+                Response: <b style='color:#374151'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
+                Redirects: <b style='color:#374151'>{r.get("redirect_count",0)}</b>
             </div>
             <div style='margin-top:10px;display:flex;gap:10px;flex-wrap:wrap'>
-                <span style='background:var(--seo-info-bg,rgba(29,78,216,.18));color:var(--seo-info-text,#93C5FD);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:#EFF6FF;color:#1D4ED8;padding:4px 10px;border-radius:8px;font-size:.78rem;border:1px solid #BFDBFE'>
                     Issues: <b>{len(issues)}</b></span>
-                <span style='background:var(--seo-error-bg,rgba(220,38,38,.18));color:var(--seo-error,#FCA5A5);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:#FEF2F2;color:#991B1B;padding:4px 10px;border-radius:8px;font-size:.78rem;border:1px solid #FECACA'>
                     Critical: <b>{crit_n}</b></span>
-                <span style='background:var(--seo-warning-bg,rgba(217,119,6,.18));color:var(--seo-warning,#FDBA74);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:#FFFBEB;color:#92400E;padding:4px 10px;border-radius:8px;font-size:.78rem;border:1px solid #FDE68A'>
                     High: <b>{high_n}</b></span>
-                <span style='background:var(--seo-success-bg,rgba(5,150,105,.18));color:var(--seo-success,#86EFAC);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:#ECFDF5;color:#065F46;padding:4px 10px;border-radius:8px;font-size:.78rem;border:1px solid #A7F3D0'>
                     Words: <b>{cont.get("word_count",0):,}</b></span>
             </div>
         </div>
