@@ -16,7 +16,6 @@ import streamlit as st
 from modules.image_auditor import _fetch_size
 from modules.api_key_manager import APIKeyManager, CATEGORIES, _API_FLAT, test_api_key
 from modules.report_generator import _score_label as _score_label
-from modules.auditor import audit_url as _raw_audit_url, audit_urls_bulk
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -58,16 +57,6 @@ st.markdown("""
 })();
 </script>
 """, unsafe_allow_html=True)
-
-# ── st.html compatibility shim (requires Streamlit ≥1.31) ─────────────────
-if not hasattr(st, "html"):
-    st.html = lambda s, **kw: st.markdown(s, unsafe_allow_html=True)
-
-# ── Module-level cached audit wrapper (cache keyed by args, not function obj) ─
-@st.cache_data(ttl=3600, show_spinner=False)
-def _cached_audit_url(url, atype, check_links, validate_links, fetch_pagespeed=False, psi_api_key=None):
-    return _raw_audit_url(url, atype, check_links, validate_links,
-                          fetch_pagespeed=fetch_pagespeed, psi_api_key=psi_api_key)
 
 # ── Session state ──────────────────────────────────────────────────────────
 _PAGES = [
@@ -563,51 +552,43 @@ def render_inline_result(r):
 
     st.markdown("---")
 
-    # ── Score hero ────────────────────────────────────────────────────────
+    # ── Score banner ──────────────────────────────────────────────────────
     import html as _html_mod
-    _url_safe   = _html_mod.escape(r.get("url", "")[:90])
-    _title_safe = _html_mod.escape((meta.get("title") or {}).get("content", "") or _url_safe)[:70]
-
-    _arc_deg   = (score / 100) * 360
-    _arc_color = "#34D399" if score >= 70 else "#FCD34D" if score >= 50 else "#F87171"
-    _grade     = "A" if score >= 85 else "B" if score >= 70 else "C" if score >= 55 else "D"
-
-    def _cat_cls(s):  return "g" if s >= 70 else "w" if s >= 50 else "r"
-    def _bar_clr(s):  return "#34D399" if s >= 70 else "#FCD34D" if s >= 50 else "#F87171"
-
-    _meta_s  = (meta.get("score") or 0)
-    _cont_s  = (cont.get("score") or 0)
-    _link_s  = (il.get("score") or el_.get("score") or 0)
-    _sch_s   = (adv.get("schema_score") or r.get("schema", {}).get("score") or 0)
-    _tech_s  = (idx_d.get("score") or r.get("technical", {}).get("score") or 0)
-    _img_s   = (imgs.get("score") or 0)
-
-    st.html(f"""
-    <div class='score-hero'>
-      <div class='score-arc-bg' style='background:conic-gradient(from -90deg,{_arc_color} {_arc_deg:.1f}deg,rgba(255,255,255,0.07) 0deg);'>
-        <div class='score-arc-inner'>
-          <div class='score-arc-num'>{score}</div>
-          <div class='score-arc-lbl'>/ 100</div>
+    _url_safe = _html_mod.escape(r.get("url", "")[:100])
+    st.markdown(f"""
+    <div style='background:var(--seo-banner-bg,linear-gradient(135deg,#0F172A,#1E293B));
+    border-radius:16px;padding:22px 28px;margin-bottom:20px;
+    display:flex;align-items:center;gap:32px;flex-wrap:wrap;
+    border:1px solid var(--seo-border,rgba(99,102,241,.2));
+    box-shadow:var(--seo-shadow-md,0 4px 20px rgba(0,0,0,.15))'>
+        <div style='text-align:center;min-width:100px'>
+            <div style='font-size:3.2rem;font-weight:900;color:{color};line-height:1;letter-spacing:-0.04em'>{score}</div>
+            <div style='font-size:.75rem;color:var(--seo-banner-muted,#94A3B8);margin-top:4px;text-transform:uppercase;letter-spacing:.06em'>SEO Score</div>
+            <div style='margin-top:8px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
         </div>
-      </div>
-      <div class='score-hero-mid'>
-        <div class='score-hero-url'>{_url_safe}</div>
-        <div class='score-hero-title'>{_title_safe}</div>
-        <div class='score-cats'>
-          <div class='score-cat'><span class='score-cat-lbl'>Metadata</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_meta_s}%;background:{_bar_clr(_meta_s)};'></div></div><span class='score-cat-n {_cat_cls(_meta_s)}'>{_meta_s}</span></div>
-          <div class='score-cat'><span class='score-cat-lbl'>Content</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_cont_s}%;background:{_bar_clr(_cont_s)};'></div></div><span class='score-cat-n {_cat_cls(_cont_s)}'>{_cont_s}</span></div>
-          <div class='score-cat'><span class='score-cat-lbl'>Links</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_link_s}%;background:{_bar_clr(_link_s)};'></div></div><span class='score-cat-n {_cat_cls(_link_s)}'>{_link_s}</span></div>
-          <div class='score-cat'><span class='score-cat-lbl'>Schema</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_sch_s}%;background:{_bar_clr(_sch_s)};'></div></div><span class='score-cat-n {_cat_cls(_sch_s)}'>{_sch_s}</span></div>
-          <div class='score-cat'><span class='score-cat-lbl'>Technical</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_tech_s}%;background:{_bar_clr(_tech_s)};'></div></div><span class='score-cat-n {_cat_cls(_tech_s)}'>{_tech_s}</span></div>
-          <div class='score-cat'><span class='score-cat-lbl'>Images</span><div class='score-cat-bar'><div class='score-cat-fill' style='width:{_img_s}%;background:{_bar_clr(_img_s)};'></div></div><span class='score-cat-n {_cat_cls(_img_s)}'>{_img_s}</span></div>
+        <div style='flex:1;min-width:200px'>
+            <div style='font-size:.92rem;font-weight:700;color:var(--seo-banner-text,#F1F5F9);margin-bottom:8px;
+            word-break:break-all;line-height:1.4'>
+                🌐 {_url_safe}
+            </div>
+            <div style='font-size:.79rem;color:var(--seo-banner-muted,#94A3B8);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px'>
+                <span>Type: <b style='color:var(--seo-banner-label,#CBD5E1)'>{atype.title()}</b></span>
+                <span>HTTP: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("status_code",0)}</b></span>
+                <span>Response: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("response_time",0):.2f}s</b></span>
+                <span>Redirects: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("redirect_count",0)}</b></span>
+            </div>
+            <div style='display:flex;gap:8px;flex-wrap:wrap'>
+                <span style='background:rgba(96,165,250,.15);color:#93C5FD;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
+                    Issues: <b>{len(issues)}</b></span>
+                <span style='background:rgba(248,113,113,.15);color:#FCA5A5;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
+                    Critical: <b>{crit_n}</b></span>
+                <span style='background:rgba(251,146,60,.15);color:#FDBA74;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
+                    High: <b>{high_n}</b></span>
+                <span style='background:rgba(16,185,129,.15);color:#6EE7B7;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
+                    Words: <b>{cont.get("word_count",0):,}</b></span>
+            </div>
         </div>
-      </div>
-      <div class='score-hero-stats'>
-        <div class='hero-stat'><div class='hero-stat-n gold'>{_grade}</div><div class='hero-stat-l'>Grade</div></div>
-        <div class='hero-stat'><div class='hero-stat-n red'>{crit_n}</div><div class='hero-stat-l'>Critical</div></div>
-        <div class='hero-stat'><div class='hero-stat-n amber'>{high_n}</div><div class='hero-stat-l'>High</div></div>
-      </div>
-    </div>""")
+    </div>""", unsafe_allow_html=True)
 
     if r.get("ssl_warning"):
         st.warning("⚠️ TLS/SSL certificate could not be verified for this URL. The audit continued with certificate validation disabled — treat results with caution.")
@@ -1180,46 +1161,40 @@ def render_inline_result(r):
                     f"</tr></thead><tbody>{kw_rows}</tbody></table></div>"
                 )
 
-    # Tab 6 — Issues (severity-grouped)
+    # Tab 6 — Issues (thematic)
     with tabs[6]:
-        import html as _h_esc
-        _crit_issues = [i for i in issues if i.get("severity","").lower() in ("critical",)]
-        _high_issues = [i for i in issues if i.get("severity","").lower() in ("high",)]
-        _med_issues  = [i for i in issues if i.get("severity","").lower() in ("medium","moderate","low","")]
-
-        if not issues:
-            st.success("No issues found — this page looks clean.")
+        from modules.scoring import get_thematic_issues
+        themed = get_thematic_issues(issues)
+        if not themed:
+            st.success("🎉 No issues found!")
         else:
-            def _issue_rows(rows, dot_cls, tag_cls, tag_lbl):
-                out = ""
-                for iss in rows:
-                    t = _h_esc.escape(str(iss.get("issue", iss.get("message", ""))))
-                    d = _h_esc.escape(str(iss.get("recommendation", iss.get("description", ""))))
-                    imp = iss.get("impact_score", 0)
-                    out += f"""
-                    <div class='issue-row'>
-                      <div class='issue-dot {dot_cls}'></div>
-                      <div class='issue-body'>
-                        <div class='issue-title'>{t}</div>
-                        {'<div class="issue-desc">' + d + '</div>' if d else ''}
-                        {'<div class="issue-desc" style="color:var(--seo-text-3);">Impact: ' + str(imp) + '/10</div>' if imp else ''}
-                      </div>
-                      <span class='issue-tag {tag_cls}'>{tag_lbl}</span>
-                    </div>"""
-                return out
-
-            parts = []
-            if _crit_issues:
-                parts.append(f"<div class='issue-section-head'>Critical <span class='issue-cnt r'>{len(_crit_issues)}</span></div>")
-                parts.append(_issue_rows(_crit_issues, "r", "r", "Critical"))
-            if _high_issues:
-                parts.append(f"<div class='issue-section-head'>High <span class='issue-cnt w'>{len(_high_issues)}</span></div>")
-                parts.append(_issue_rows(_high_issues, "w", "w", "High"))
-            if _med_issues:
-                parts.append(f"<div class='issue-section-head'>Other <span class='issue-cnt b'>{len(_med_issues)}</span></div>")
-                parts.append(_issue_rows(_med_issues, "b", "b", "Info"))
-
-            st.html(f"<div class='seo-card'>{''.join(parts)}</div>")
+            for theme, theme_issues in themed.items():
+                with st.expander(f"**{theme}** — {len(theme_issues)} issue(s)",
+                                 expanded=any(i.get("severity") in ["Critical","High"]
+                                              for i in theme_issues)):
+                    for iss in sorted(theme_issues,
+                                      key=lambda x: x.get("impact_score",0), reverse=True):
+                        sev = iss.get("severity","Low")
+                        imp = iss.get("impact_score",0)
+                        eff = iss.get("effort","—")
+                        st.markdown(f"""
+                        <div style='padding:10px 14px;background:{_sev_bg(sev)};border-radius:8px;
+                        margin-bottom:8px;border-left:4px solid {_sev_color(sev)}'>
+                            <div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>
+                                <span style='font-weight:700;font-size:.88rem;color:var(--seo-heading,#0F172A)'>
+                                    {iss.get("issue","")}</span>
+                                <div style='display:flex;gap:6px'>
+                                    <span style='background:{_sev_color(sev)};color:white;
+                                    padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700'>{sev}</span>
+                                    <span style='background:var(--seo-accent-light,rgba(79,70,229,.12));color:var(--seo-accent,#4F46E5);
+                                    padding:2px 8px;border-radius:4px;font-size:.72rem'>Impact: {imp}/10</span>
+                                    <span style='background:var(--seo-card-bg-alt,#F1F5F9);color:var(--seo-text-light,#475569);
+                                    padding:2px 8px;border-radius:4px;font-size:.72rem'>Effort: {eff}</span>
+                                </div>
+                            </div>
+                            <div style='font-size:.75rem;color:var(--seo-muted,#64748B);margin-top:3px'>📂 {iss.get("category","")}</div>
+                            <div style='font-size:.83rem;color:var(--seo-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
+                        </div>""", unsafe_allow_html=True)
 
     # Tab 7 — Top Recommendations by Impact
     with tabs[7]:
@@ -1262,7 +1237,15 @@ def page_dashboard():
     results  = st.session_state.audit_results
     last_date= st.session_state.last_audit_date
 
-    st.html("<div class='page-header'><h2>Overview</h2><p>Audit health at a glance — scores, issues, and recent activity</p></div>")
+    st.markdown("""
+    <div class='page-header'>
+        <div class='page-header-icon'>🔍</div>
+        <div>
+            <div class='page-header-title'>SEO Technical Audit Dashboard</div>
+            <div class='page-header-sub'>Comprehensive SEO analysis — metadata · links · performance · schema · content</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1: st.caption(f"**Last Audit:** {last_date}" if last_date else "No audit run yet")
@@ -1619,7 +1602,14 @@ def page_dashboard():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_new_audit():
-    st.html("<div class='page-header'><h2>New audit</h2><p>Single URL · Bulk CSV/XLSX · Sitemap XML — full technical SEO analysis</p></div>")
+    st.markdown("""
+    <div class='page-header'>
+        <div class='page-header-icon'>🚀</div>
+        <div>
+            <div class='page-header-title'>New Audit</div>
+            <div class='page-header-sub'>Single URL · Bulk CSV/XLSX · Sitemap XML — full technical SEO check</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["Single URL", "Bulk Upload (CSV/XLSX)", "Sitemap XML"])
 
@@ -1663,8 +1653,13 @@ def page_new_audit():
     atype_map = {"Auto-Detect":"auto","Course":"course","Blog":"blog","General":"general"}
     atype = atype_map[audit_type]
 
-    # audit_url uses module-level _cached_audit_url for stable caching across reruns
-    audit_url = _cached_audit_url
+    from modules.auditor import audit_url as _raw_audit_url, audit_urls_bulk
+
+    # ── Cached wrapper — same URL + same settings = same result every time ──
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def audit_url(url, atype, check_links, validate_links, fetch_pagespeed=False, psi_api_key=None):
+        return _raw_audit_url(url, atype, check_links, validate_links,
+                              fetch_pagespeed=fetch_pagespeed, psi_api_key=psi_api_key)
 
     # ── Single URL ────────────────────────────────────────────────────────
     with tab1:
@@ -1771,7 +1766,10 @@ def page_new_audit():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_results():
-    st.html("<div class='page-header'><h2>Audit results</h2><p>All audited URLs — scores, issues, and filters</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📋</div>
+    <div><div class='page-header-title'>Audit Results</div>
+    <div class='page-header-sub'>All audited URLs with scores, issues, and filters</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results yet. Run a **New Audit** first.")
@@ -1863,7 +1861,7 @@ def page_results():
     if st.button("Open Detail View →", type="primary"):
         idx = next((i for i,r in enumerate(results) if r.get("url")==selected_url), 0)
         st.session_state.selected_url_idx = idx
-        st.session_state["nav_page"] = "🔎 URL Detail"
+        st.session_state.page = "URL Detail"
         st.rerun()
 
     if st.session_state.get("_confirm_clear"):
@@ -1891,7 +1889,10 @@ def page_results():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_url_detail():
-    st.html("<div class='page-header'><h2>URL detail</h2><p>Deep-dive inspection — metadata · links · SERP · schema · technical · keywords</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>🔎</div>
+    <div><div class='page-header-title'>URL Detail</div>
+    <div class='page-header-sub'>Deep-dive: metadata · links · SERP preview · schema · technical · keywords · issues</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results yet. Run an audit first.")
@@ -2481,7 +2482,10 @@ def page_url_detail():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_link_analysis():
-    st.html("<div class='page-header'><h2>Link analysis</h2><p>Internal · external · broken · nofollow · anchor text across all audited URLs</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>🔗</div>
+    <div><div class='page-header-title'>Link Analysis</div>
+    <div class='page-header-sub'>Internal · external · broken · nofollow · anchor text across all audited URLs</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results yet. Run an audit first.")
@@ -3097,7 +3101,10 @@ def _pick_url(results):
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_performance():
-    st.html("<div class='page-header'><h2>Performance</h2><p>Core Web Vitals · PageSpeed · mobile · page size · security headers</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>⚡</div>
+    <div><div class='page-header-title'>Performance Audit</div>
+    <div class='page-header-sub'>Core Web Vitals · PageSpeed · Mobile · Page size · Security headers</div></div></div>""",
+    unsafe_allow_html=True)
     st.markdown(  # keep original blank line for indentation integrity
         "",
         unsafe_allow_html=True,
@@ -3967,7 +3974,10 @@ def _page_image_seo_body():
 
 def page_heading_analysis():
     import html as _esc
-    st.html("<div class='page-header'><h2>Heading structure</h2><p>H1–H6 hierarchy · violations · empty headings · duplicates</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📝</div>
+    <div><div class='page-header-title'>Heading Structure Audit</div>
+    <div class='page-header-sub'>H1–H6 hierarchy · violations · empty headings · duplicates</div></div></div>""",
+    unsafe_allow_html=True)
     st.markdown(
         "",
         unsafe_allow_html=True,
@@ -4295,7 +4305,10 @@ def page_settings():
     if "_api_test_running" not in st.session_state:
         st.session_state["_api_test_running"] = None
 
-    st.html("<div class='page-header'><h2>Settings &amp; API keys</h2><p>Configure Google PageSpeed, Ahrefs, SEMrush, and 60+ integrations</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>⚙️</div>
+    <div><div class='page-header-title'>Settings &amp; API Keys</div>
+    <div class='page-header-sub'>Configure API keys for Google PageSpeed, Ahrefs, SEMrush, and 60+ services</div></div></div>""",
+    unsafe_allow_html=True)
 
     # ── Summary bar ────────────────────────────────────────────────────────
     total_apis = sum(len(c["apis"]) for c in CATEGORIES)
@@ -4544,7 +4557,10 @@ The app loads Streamlit Secrets automatically on every startup — no re-entry n
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_export():
-    st.html("<div class='page-header'><h2>Export reports</h2><p>Download audit data as CSV · Excel · PDF executive summary</p></div>")
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📤</div>
+    <div><div class='page-header-title'>Export Reports</div>
+    <div class='page-header-sub'>Download audit data as CSV · Excel (3-sheet, colour-coded) · PDF executive summary</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results to export. Run an audit first.")
@@ -4589,15 +4605,16 @@ def page_export():
 # ════════════════════════════════════════════════════════════════════════════
 
 with st.sidebar:
-    st.html("""
-    <div class='sb-logo'>
-      <div class='sb-logo-mark'>🔍</div>
-      <div>
-        <div class='sb-logo-name'>SEO Audit</div>
-        <div class='sb-logo-sub'>Technical dashboard</div>
-      </div>
+    st.markdown("""
+    <div style='padding:20px 12px 12px;text-align:center'>
+        <div style='background:linear-gradient(135deg,#4F46E5,#7C3AED);width:48px;height:48px;
+        border-radius:14px;display:flex;align-items:center;justify-content:center;
+        font-size:1.5rem;margin:0 auto 10px;box-shadow:0 4px 14px rgba(79,70,229,0.3)'>🔍</div>
+        <div style='font-size:1rem;font-weight:800;color:#1E293B;letter-spacing:-0.01em'>SEO Audit</div>
+        <div style='font-size:.7rem;color:#6B7280;margin-top:2px;text-transform:uppercase;letter-spacing:.08em'>Enterprise Platform</div>
     </div>
-    """)
+    <div style='height:1px;background:linear-gradient(90deg,transparent,rgba(79,70,229,.2),transparent);margin:0 8px 12px'></div>
+    """, unsafe_allow_html=True)
 
     # Programmatic navigation — resolve BEFORE rendering the radio
     if st.session_state.get("nav_page"):
@@ -4640,16 +4657,6 @@ with st.sidebar:
         if broken:
             st.markdown(f"<div style='color:#F97316;font-size:.8rem'>🔴 {broken} broken link(s)</div>",
                         unsafe_allow_html=True)
-
-    st.html("""
-    <div class='sb-profile'>
-      <div class='sb-avatar'>VR</div>
-      <div>
-        <div class='sb-user-name'>Venkat Ramana</div>
-        <div class='sb-user-email'>venkat.r@edstellar.com</div>
-      </div>
-    </div>
-    """)
 
 
 # ════════════════════════════════════════════════════════════════════════════

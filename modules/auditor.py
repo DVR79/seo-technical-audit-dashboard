@@ -523,12 +523,11 @@ def audit_url(url, audit_type="auto", check_links=True, validate_links=False,
     soup = fetch["soup"]
     # Store plain text for keyword density analysis (strip script/style/nav)
     try:
-        _raw_html = fetch.get("html", "") or str(soup)
-        _txt_soup = BeautifulSoup(_raw_html, "lxml")
+        _txt_soup = soup.__class__(str(soup), "lxml")
         for _tag in _txt_soup(["script", "style", "nav", "footer", "header"]):
             _tag.decompose()
         result["_soup_text"] = _txt_soup.get_text(" ", strip=True)[:50000]
-    except Exception as _e:
+    except Exception:
         result["_soup_text"] = ""
 
     result["metadata"]     = analyze_metadata(soup, url)
