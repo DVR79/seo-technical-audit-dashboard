@@ -1294,7 +1294,8 @@ def page_dashboard():
     """)
 
     # ── 4 Stat cards ──────────────────────────────────────────────────────
-    avg_color = "green" if avg_sc >= 75 else "amber" if avg_sc >= 50 else "red"
+    avg_color = "green" if (total and avg_sc >= 75) else "amber" if (total and avg_sc >= 50) else ("red" if (total and avg_sc < 50) else "")
+    avg_disp  = str(avg_sc) if total else "—"
     st.html(f"""
     <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;'>
       <div class='stat-card blue'>
@@ -1304,7 +1305,7 @@ def page_dashboard():
       </div>
       <div class='stat-card green'>
         <div class='stat-label'>Avg SEO score</div>
-        <div class='stat-value {avg_color}'>{avg_sc if total else '—'}</div>
+        <div class='stat-value {avg_color}'>{avg_disp}</div>
         <div class='stat-footer'>across all sessions</div>
       </div>
       <div class='stat-card amber'>
@@ -1377,22 +1378,6 @@ def page_dashboard():
             </div>
             """)
 
-        # Quick audit input + navigate button
-        st.html("""
-        <div class='seo-card' style='margin-top:0;'>
-          <div class='seo-card-head'><h3>Run a quick audit</h3></div>
-          <div class='seo-card-body' style='padding:14px 16px;'>
-            <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
-            padding:9px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:8px;'>
-              🌐 Paste a URL to audit…
-            </div>
-          </div>
-        </div>
-        """)
-        if st.button("🔍 Open audit form", key="dash_open_audit", use_container_width=True):
-            st.session_state["nav_page"] = "🚀 New Audit"
-            st.rerun()
-
     with col_right:
         # Score distribution
         def _bar(pct, color):
@@ -1450,6 +1435,22 @@ def page_dashboard():
             if st.button("View all results →", key="dash_view_results", use_container_width=True):
                 st.session_state["nav_page"] = "📋 Audit Results"
                 st.rerun()
+
+        # Quick audit card — right column, below Issue summary
+        st.html("""
+        <div class='seo-card' style='margin-top:0;'>
+          <div class='seo-card-head'><h3>Run a quick audit</h3></div>
+          <div style='padding:14px 16px;'>
+            <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
+            padding:9px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:8px;'>
+              🌐 Paste a URL to audit…
+            </div>
+          </div>
+        </div>
+        """)
+        if st.button("🔍 Open audit form", key="dash_open_audit", use_container_width=True):
+            st.session_state["nav_page"] = "🚀 New Audit"
+            st.rerun()
 
     if not results:
         return

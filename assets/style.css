@@ -465,7 +465,7 @@ hr { border-color: var(--seo-border) !important; margin: 1rem 0 !important; }
 /* ── Score distribution bars ────────────────────────── */
 
 .dist-bar-row  { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
-.dist-bar-lbl  { font-size: 11px; color: var(--seo-text-2); width: 72px; flex-shrink: 0; }
+.dist-bar-lbl  { font-size: 11px; color: var(--seo-text-2); width: 60px; flex-shrink: 0; white-space: nowrap; }
 .dist-bar-track{ flex: 1; height: 6px; background: var(--seo-border-inner); border-radius: 3px; overflow: hidden; }
 .dist-bar-fill { height: 100%; border-radius: 3px; }
 .dist-bar-num  { font-size: 11px; color: var(--seo-text); width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
