@@ -28,7 +28,8 @@ st.set_page_config(
 # ── Custom CSS ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def _load_css():
-    p = Path("assets/style.css")
+    # Use absolute path relative to this file so CWD doesn't matter
+    p = Path(__file__).parent / "assets" / "style.css"
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 _css = _load_css()
@@ -58,6 +59,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Session state ──────────────────────────────────────────────────────────
+_PAGES = [
+    "📊 Dashboard Overview",
+    "🚀 New Audit",
+    "📋 Audit Results",
+    "🔎 URL Detail",
+    "🔗 Link Analysis",
+    "⚡ Performance Audit",
+    "📝 Heading Analysis",
+    "📤 Export Reports",
+    "⚙️ Settings",
+]
+
 for key, default in [
     ("audit_results", []),
     ("last_audit_date", None),
@@ -66,6 +79,7 @@ for key, default in [
     ("dup_report", None),
     ("nav_page", None),
     ("nav_filter", None),
+    ("active_page", _PAGES[0]),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -539,33 +553,38 @@ def render_inline_result(r):
     st.markdown("---")
 
     # ── Score banner ──────────────────────────────────────────────────────
+    import html as _html_mod
+    _url_safe = _html_mod.escape(r.get("url", "")[:100])
     st.markdown(f"""
-    <div style='background:var(--seo-banner-bg,linear-gradient(135deg,#0F172A,#1E293B));border-radius:14px;
-    padding:20px 28px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;
-    border:1px solid var(--seo-border,rgba(148,163,184,.22))'>
-        <div style='text-align:center;min-width:90px'>
-            <div style='font-size:3rem;font-weight:800;color:{color};line-height:1'>{score}</div>
-            <div style='font-size:.78rem;color:var(--seo-banner-muted,#94A3B8);margin-top:2px'>SEO Score / 100</div>
-            <div style='margin-top:6px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
+    <div style='background:var(--seo-banner-bg,linear-gradient(135deg,#0F172A,#1E293B));
+    border-radius:16px;padding:22px 28px;margin-bottom:20px;
+    display:flex;align-items:center;gap:32px;flex-wrap:wrap;
+    border:1px solid var(--seo-border,rgba(99,102,241,.2));
+    box-shadow:var(--seo-shadow-md,0 4px 20px rgba(0,0,0,.15))'>
+        <div style='text-align:center;min-width:100px'>
+            <div style='font-size:3.2rem;font-weight:900;color:{color};line-height:1;letter-spacing:-0.04em'>{score}</div>
+            <div style='font-size:.75rem;color:var(--seo-banner-muted,#94A3B8);margin-top:4px;text-transform:uppercase;letter-spacing:.06em'>SEO Score</div>
+            <div style='margin-top:8px'><span class='{_score_class(score)} score-badge'>{label}</span></div>
         </div>
         <div style='flex:1;min-width:200px'>
-            <div style='font-size:.95rem;font-weight:700;color:var(--seo-banner-text,#F1F5F9);margin-bottom:6px;word-break:break-all'>
-                {r.get("url","")[:100]}
+            <div style='font-size:.92rem;font-weight:700;color:var(--seo-banner-text,#F1F5F9);margin-bottom:8px;
+            word-break:break-all;line-height:1.4'>
+                🌐 {_url_safe}
             </div>
-            <div style='font-size:.8rem;color:var(--seo-banner-muted,#94A3B8)'>
-                Type: <b style='color:var(--seo-banner-label,#CBD5E1)'>{atype.title()}</b> &nbsp;|&nbsp;
-                HTTP: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("status_code",0)}</b> &nbsp;|&nbsp;
-                Response: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("response_time",0):.2f}s</b> &nbsp;|&nbsp;
-                Redirects: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("redirect_count",0)}</b>
+            <div style='font-size:.79rem;color:var(--seo-banner-muted,#94A3B8);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px'>
+                <span>Type: <b style='color:var(--seo-banner-label,#CBD5E1)'>{atype.title()}</b></span>
+                <span>HTTP: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("status_code",0)}</b></span>
+                <span>Response: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("response_time",0):.2f}s</b></span>
+                <span>Redirects: <b style='color:var(--seo-banner-label,#CBD5E1)'>{r.get("redirect_count",0)}</b></span>
             </div>
-            <div style='margin-top:10px;display:flex;gap:10px;flex-wrap:wrap'>
-                <span style='background:var(--seo-info-bg,rgba(29,78,216,.18));color:var(--seo-info-text,#93C5FD);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+            <div style='display:flex;gap:8px;flex-wrap:wrap'>
+                <span style='background:rgba(96,165,250,.15);color:#93C5FD;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
                     Issues: <b>{len(issues)}</b></span>
-                <span style='background:var(--seo-error-bg,rgba(220,38,38,.18));color:var(--seo-error,#FCA5A5);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:rgba(248,113,113,.15);color:#FCA5A5;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
                     Critical: <b>{crit_n}</b></span>
-                <span style='background:var(--seo-warning-bg,rgba(217,119,6,.18));color:var(--seo-warning,#FDBA74);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:rgba(251,146,60,.15);color:#FDBA74;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
                     High: <b>{high_n}</b></span>
-                <span style='background:var(--seo-success-bg,rgba(5,150,105,.18));color:var(--seo-success,#86EFAC);padding:4px 10px;border-radius:8px;font-size:.78rem'>
+                <span style='background:rgba(16,185,129,.15);color:#6EE7B7;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600'>
                     Words: <b>{cont.get("word_count",0):,}</b></span>
             </div>
         </div>
@@ -577,7 +596,7 @@ def render_inline_result(r):
     # ── Tabs ──────────────────────────────────────────────────────────────
     tabs = st.tabs([
         "📊 Summary", "🔗 Outgoing Links", "🌐 SERP & Social",
-        "🔬 Schema", "🔧 Technical", "⚠️ Issues", "💡 Top Recommendations"
+        "🔬 Schema", "🔧 Technical", "🔑 Keywords", "⚠️ Issues", "💡 Top Recommendations"
     ])
 
     # Tab 0 — Summary
@@ -1052,8 +1071,98 @@ def render_inline_result(r):
         if _tech.get("has_rss_feed"):
             st.success(f"✅ RSS/Atom feed detected: {_tech.get('rss_url', '')}")
 
-    # Tab 5 — Issues (thematic)
+    # Tab 5 — Keyword Density
     with tabs[5]:
+        st.markdown('<div class="section-header">🔑 Keyword Density Analysis</div>', unsafe_allow_html=True)
+        st.caption("Top words appearing in visible page content. Helps identify primary and secondary topics.")
+        import re as _re
+        from collections import Counter
+        _html_content = r.get("content", {})
+        _word_count   = _html_content.get("word_count", 0)
+        # Pull raw text via soup if available, else skip
+        _raw_text = ""
+        try:
+            _soup_ref = r.get("_soup_text", "")
+            if _soup_ref:
+                _raw_text = _soup_ref
+            else:
+                # Build from title + description + headings as fallback
+                _title = r.get("metadata", {}).get("title", "") or ""
+                _desc  = r.get("metadata", {}).get("description", "") or ""
+                _h1s   = " ".join(r.get("headings", {}).get("h1_texts", []) or [])
+                _raw_text = f"{_title} {_desc} {_h1s}"
+        except Exception:
+            _raw_text = ""
+
+        _STOPWORDS = {
+            "the","a","an","and","or","but","in","on","at","to","for","of","with",
+            "is","are","was","were","be","been","being","have","has","had","do","does",
+            "did","will","would","could","should","may","might","shall","can","this",
+            "that","these","those","it","its","their","they","we","our","you","your",
+            "he","she","his","her","from","by","as","into","through","about","up","out",
+            "if","then","than","so","not","no","only","also","more","what","how","all",
+            "i","me","my","us","who","which","when","where","there","here","any","some",
+        }
+
+        if _raw_text:
+            _words = _re.findall(r'\b[a-z]{3,}\b', _raw_text.lower())
+            _filtered = [w for w in _words if w not in _STOPWORDS]
+            _freq = Counter(_filtered)
+            _total_words = max(len(_filtered), 1)
+            _top_kw = _freq.most_common(20)
+        else:
+            _top_kw = []
+
+        if not _top_kw:
+            st.info("Keyword data unavailable for this audit. The content text could not be extracted.")
+        else:
+            kw_col1, kw_col2 = st.columns([3, 2])
+            with kw_col1:
+                st.markdown("**Top 20 Keywords by Frequency**")
+                kw_html = "<div style='display:flex;flex-wrap:wrap;gap:8px;padding:12px 0'>"
+                for word, count in _top_kw:
+                    density = round(count / _total_words * 100, 1)
+                    # Size varies with frequency
+                    fs = 0.75 + (count / max(_top_kw[0][1], 1)) * 0.55
+                    kw_html += (
+                        f"<span style='background:var(--seo-accent-light,rgba(79,70,229,.10));"
+                        f"border:1px solid var(--seo-accent-border,rgba(79,70,229,.2));"
+                        f"color:var(--seo-accent,#4F46E5);border-radius:8px;"
+                        f"padding:4px 12px;font-size:{fs:.2f}rem;font-weight:600;"
+                        f"cursor:default' title='{count}× ({density}%)'>"
+                        f"{word} <span style='background:var(--seo-accent,#4F46E5);color:#fff;"
+                        f"border-radius:4px;padding:1px 5px;font-size:.65rem;margin-left:3px'>{count}</span>"
+                        f"</span>"
+                    )
+                kw_html += "</div>"
+                st.markdown(kw_html, unsafe_allow_html=True)
+            with kw_col2:
+                st.markdown("**Density Table**")
+                kw_rows = ""
+                for rank, (word, count) in enumerate(_top_kw[:15], 1):
+                    density = round(count / _total_words * 100, 2)
+                    bar_w = round(count / max(_top_kw[0][1], 1) * 100)
+                    kw_rows += (
+                        f"<tr>"
+                        f"<td style='padding:5px 8px;font-size:.75rem;color:var(--seo-muted,#64748B);width:24px'>{rank}</td>"
+                        f"<td style='padding:5px 8px;font-size:.82rem;font-weight:600;color:var(--seo-heading,#0F172A)'>{word}</td>"
+                        f"<td style='padding:5px 8px'><div style='background:var(--seo-border,rgba(148,163,184,.2));border-radius:4px;height:8px;width:100%'>"
+                        f"<div style='width:{bar_w}%;background:var(--seo-accent,#4F46E5);height:100%;border-radius:4px'></div></div></td>"
+                        f"<td style='padding:5px 8px;font-size:.78rem;color:var(--seo-muted,#64748B);white-space:nowrap'>{count}× &nbsp; {density}%</td>"
+                        f"</tr>"
+                    )
+                st.html(
+                    f"<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>"
+                    f"<thead><tr>"
+                    f"<th style='padding:5px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>#</th>"
+                    f"<th style='padding:5px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>Keyword</th>"
+                    f"<th style='padding:5px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left;min-width:80px'>Freq</th>"
+                    f"<th style='padding:5px 8px;font-size:.72rem;color:var(--seo-muted,#64748B);text-align:left'>Count / Density</th>"
+                    f"</tr></thead><tbody>{kw_rows}</tbody></table></div>"
+                )
+
+    # Tab 6 — Issues (thematic)
+    with tabs[6]:
         from modules.scoring import get_thematic_issues
         themed = get_thematic_issues(issues)
         if not themed:
@@ -1087,8 +1196,8 @@ def render_inline_result(r):
                             <div style='font-size:.83rem;color:var(--seo-info-text,#1D4ED8);margin-top:6px'>✅ {iss.get("recommendation","")}</div>
                         </div>""", unsafe_allow_html=True)
 
-    # Tab 6 — Top Recommendations by Impact
-    with tabs[6]:
+    # Tab 7 — Top Recommendations by Impact
+    with tabs[7]:
         from modules.scoring import get_top_issues_by_impact
         st.markdown('<div class="section-header">💡 Top Issues by Impact Score</div>', unsafe_allow_html=True)
         st.caption("Sorted by impact score (10 = highest ranking factor). Fix these first.")
@@ -1129,9 +1238,13 @@ def page_dashboard():
     last_date= st.session_state.last_audit_date
 
     st.markdown("""
-    <h1 style='font-size:1.8rem;font-weight:800;color:var(--seo-heading,#0F172A);margin-bottom:2px'>
-    🔍 SEO Technical Audit Dashboard</h1>
-    <p style='color:var(--seo-muted,#64748B);margin-bottom:20px'>Comprehensive SEO Audit for Courses and Blogs</p>
+    <div class='page-header'>
+        <div class='page-header-icon'>🔍</div>
+        <div>
+            <div class='page-header-title'>SEO Technical Audit Dashboard</div>
+            <div class='page-header-sub'>Comprehensive SEO analysis — metadata · links · performance · schema · content</div>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
@@ -1489,8 +1602,14 @@ def page_dashboard():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_new_audit():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🚀 New Audit</h2>",
-                unsafe_allow_html=True)
+    st.markdown("""
+    <div class='page-header'>
+        <div class='page-header-icon'>🚀</div>
+        <div>
+            <div class='page-header-title'>New Audit</div>
+            <div class='page-header-sub'>Single URL · Bulk CSV/XLSX · Sitemap XML — full technical SEO check</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs(["Single URL", "Bulk Upload (CSV/XLSX)", "Sitemap XML"])
 
@@ -1534,7 +1653,13 @@ def page_new_audit():
     atype_map = {"Auto-Detect":"auto","Course":"course","Blog":"blog","General":"general"}
     atype = atype_map[audit_type]
 
-    from modules.auditor import audit_url, audit_urls_bulk
+    from modules.auditor import audit_url as _raw_audit_url, audit_urls_bulk
+
+    # ── Cached wrapper — same URL + same settings = same result every time ──
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def audit_url(url, atype, check_links, validate_links, fetch_pagespeed=False, psi_api_key=None):
+        return _raw_audit_url(url, atype, check_links, validate_links,
+                              fetch_pagespeed=fetch_pagespeed, psi_api_key=psi_api_key)
 
     # ── Single URL ────────────────────────────────────────────────────────
     with tab1:
@@ -1641,8 +1766,10 @@ def page_new_audit():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_results():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📋 Audit Results</h2>",
-                unsafe_allow_html=True)
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📋</div>
+    <div><div class='page-header-title'>Audit Results</div>
+    <div class='page-header-sub'>All audited URLs with scores, issues, and filters</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results yet. Run a **New Audit** first.")
@@ -1762,9 +1889,13 @@ def page_results():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_url_detail():
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>🔎</div>
+    <div><div class='page-header-title'>URL Detail</div>
+    <div class='page-header-sub'>Deep-dive: metadata · links · SERP preview · schema · technical · keywords · issues</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
-        st.info("No audit results yet.")
+        st.info("No audit results yet. Run an audit first.")
         return
 
     idx = st.session_state.selected_url_idx
@@ -2351,10 +2482,10 @@ def page_url_detail():
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_link_analysis():
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>🔗 Link Analysis</h2>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>🔗</div>
+    <div><div class='page-header-title'>Link Analysis</div>
+    <div class='page-header-sub'>Internal · external · broken · nofollow · anchor text across all audited URLs</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results yet. Run an audit first.")
@@ -2970,9 +3101,12 @@ def _pick_url(results):
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_performance():
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
-        "⚡ Performance Audit</h2>",
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>⚡</div>
+    <div><div class='page-header-title'>Performance Audit</div>
+    <div class='page-header-sub'>Core Web Vitals · PageSpeed · Mobile · Page size · Security headers</div></div></div>""",
+    unsafe_allow_html=True)
+    st.markdown(  # keep original blank line for indentation integrity
+        "",
         unsafe_allow_html=True,
     )
     tab_mobile, tab_image = st.tabs([
@@ -3840,8 +3974,12 @@ def _page_image_seo_body():
 
 def page_heading_analysis():
     import html as _esc
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📝</div>
+    <div><div class='page-header-title'>Heading Structure Audit</div>
+    <div class='page-header-sub'>H1–H6 hierarchy · violations · empty headings · duplicates</div></div></div>""",
+    unsafe_allow_html=True)
     st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📝 Heading Structure Audit</h2>",
+        "",
         unsafe_allow_html=True,
     )
     results = st.session_state.audit_results
@@ -4167,11 +4305,10 @@ def page_settings():
     if "_api_test_running" not in st.session_state:
         st.session_state["_api_test_running"] = None
 
-    st.markdown(
-        "<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>"
-        "⚙️ Settings &amp; API Keys</h2>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>⚙️</div>
+    <div><div class='page-header-title'>Settings &amp; API Keys</div>
+    <div class='page-header-sub'>Configure API keys for Google PageSpeed, Ahrefs, SEMrush, and 60+ services</div></div></div>""",
+    unsafe_allow_html=True)
 
     # ── Summary bar ────────────────────────────────────────────────────────
     total_apis = sum(len(c["apis"]) for c in CATEGORIES)
@@ -4420,8 +4557,10 @@ The app loads Streamlit Secrets automatically on every startup — no re-entry n
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_export():
-    st.markdown("<h2 style='font-size:1.5rem;font-weight:700;color:var(--seo-heading,#0F172A)'>📤 Export Reports</h2>",
-                unsafe_allow_html=True)
+    st.markdown("""<div class='page-header'><div class='page-header-icon'>📤</div>
+    <div><div class='page-header-title'>Export Reports</div>
+    <div class='page-header-sub'>Download audit data as CSV · Excel (3-sheet, colour-coded) · PDF executive summary</div></div></div>""",
+    unsafe_allow_html=True)
     results = st.session_state.audit_results
     if not results:
         st.info("No audit results to export. Run an audit first.")
@@ -4467,34 +4606,36 @@ def page_export():
 
 with st.sidebar:
     st.markdown("""
-    <div style='text-align:center;padding:16px 0 8px'>
-        <div style='font-size:2rem' role='img' aria-label='Search icon'>🔍</div>
-        <div style='font-size:1rem;font-weight:700;color:#F1F5F9'>SEO Audit Dashboard</div>
-        <div style='font-size:.72rem;color:#94A3B8'>Enterprise SEO Platform</div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown("---")
+    <div style='padding:20px 12px 12px;text-align:center'>
+        <div style='background:linear-gradient(135deg,#4F46E5,#7C3AED);width:48px;height:48px;
+        border-radius:14px;display:flex;align-items:center;justify-content:center;
+        font-size:1.5rem;margin:0 auto 10px'>🔍</div>
+        <div style='font-size:1rem;font-weight:800;color:#EEF2FF;letter-spacing:-0.01em'>SEO Audit</div>
+        <div style='font-size:.7rem;color:#6B7A99;margin-top:2px;text-transform:uppercase;letter-spacing:.08em'>Enterprise Platform</div>
+    </div>
+    <div style='height:1px;background:linear-gradient(90deg,transparent,rgba(79,70,229,.3),transparent);margin:0 8px 12px'></div>
+    """, unsafe_allow_html=True)
 
-    page = st.radio("Navigation", [
-        "📊 Dashboard Overview",
-        "🚀 New Audit",
-        "📋 Audit Results",
-        "🔎 URL Detail",
-        "🔗 Link Analysis",
-        "⚡ Performance Audit",
-        "📝 Heading Analysis",
-        "📤 Export Reports",
-        "⚙️ Settings",
-    ], label_visibility="collapsed")
-
-    # Legacy URL Detail routing
-    if "page" in st.session_state and st.session_state.page == "URL Detail":
-        page = "🔎 URL Detail"
+    # Programmatic navigation — resolve BEFORE rendering the radio
+    if st.session_state.get("nav_page"):
+        target = st.session_state.pop("nav_page")
+        if target in _PAGES:
+            st.session_state["active_page"] = target
+    # Legacy routing from old "page" key
+    if st.session_state.get("page") == "URL Detail":
+        st.session_state["active_page"] = "🔎 URL Detail"
         del st.session_state["page"]
 
-    # Programmatic navigation from dashboard/card buttons
-    if st.session_state.get("nav_page"):
-        page = st.session_state["nav_page"]
-        st.session_state["nav_page"] = None
+    _cur_idx = _PAGES.index(st.session_state["active_page"]) if st.session_state["active_page"] in _PAGES else 0
+
+    page = st.radio(
+        "Navigation",
+        _PAGES,
+        index=_cur_idx,
+        label_visibility="collapsed",
+    )
+    # Keep session state in sync so programmatic nav works visually
+    st.session_state["active_page"] = page
 
     results = st.session_state.audit_results
     if results:
