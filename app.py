@@ -1263,7 +1263,7 @@ def page_dashboard():
     results  = st.session_state.audit_results
     last_date= st.session_state.last_audit_date
 
-    # ── Compute stats (safe even with no data) ────────────────────────────
+    # ── Compute stats ─────────────────────────────────────────────────────
     total      = len(results)
     scores     = [r.get("seo_score", 0) for r in results]
     avg_sc     = round(sum(scores) / total, 1) if total else 0
@@ -1275,51 +1275,70 @@ def page_dashboard():
     s50        = sum(1 for s in scores if 50 <= s < 70)
     slo        = sum(1 for s in scores if s < 50)
     dist_max   = max(s90, s70, s50, slo, 1)
+    last_str   = last_date or "—"
+    avg_disp   = str(avg_sc) if total else "—"
+    avg_col    = "#059669" if (total and avg_sc >= 75) else "#D97706" if (total and avg_sc >= 50) else ("#DC2626" if total else "#94A3B8")
 
-    last_str = last_date or "—"
+    # ── Inline style helpers ──────────────────────────────────────────────
+    CARD = "background:#fff;border-radius:10px;border:1px solid #E2E8F0;overflow:hidden;margin-bottom:12px;"
+    HEAD = "padding:12px 16px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;"
+    H3   = "margin:0;font-size:13px;font-weight:600;color:#0F172A;letter-spacing:0;"
+    BODY = "padding:14px 16px;"
 
-    # ── Top bar ───────────────────────────────────────────────────────────
-    st.html("""
-    <div style='background:#fff;border-bottom:0.5px solid #E2E8F0;padding:10px 0 10px;
-    display:flex;align-items:center;gap:10px;margin-bottom:20px;border-radius:10px;padding:10px 16px;'>
-      <span style='font-size:13px;color:#94A3B8;'>🏠</span>
-      <span style='font-size:12px;color:#94A3B8;'>›</span>
-      <span style='font-size:13px;font-weight:500;color:#0F172A;'>Overview</span>
-      <div style='flex:1'></div>
-      <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
-      padding:6px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:6px;'>
-        🔍 Search audits…
-      </div>
+    def _bar_row(label, label_color, bar_color, bar_bg, pct, count):
+        return f"""
+        <div style='display:flex;align-items:center;gap:10px;padding:5px 0;'>
+          <span style='font-size:11px;color:{label_color};width:58px;flex-shrink:0;white-space:nowrap;'>{label}</span>
+          <div style='flex:1;height:6px;background:{bar_bg};border-radius:3px;overflow:hidden;'>
+            <div style='width:{pct}%;height:100%;background:{bar_color};border-radius:3px;'></div>
+          </div>
+          <span style='font-size:11px;color:#0F172A;width:20px;text-align:right;font-variant-numeric:tabular-nums;'>{count}</span>
+        </div>"""
+
+    # ── Breadcrumb bar ────────────────────────────────────────────────────
+    st.markdown("""
+    <div style='background:#fff;border-radius:10px;border:1px solid #E2E8F0;
+    padding:10px 16px;display:flex;align-items:center;gap:8px;margin-bottom:16px;'>
+      <span style='font-size:12px;color:#94A3B8;'>Home</span>
+      <span style='font-size:11px;color:#CBD5E1;'>›</span>
+      <span style='font-size:12px;font-weight:500;color:#0F172A;'>Overview</span>
+      <div style='flex:1;'></div>
+      <div style='background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;
+      padding:6px 12px;font-size:12px;color:#94A3B8;'>🔍 Search audits…</div>
     </div>
-    """)
+    """, unsafe_allow_html=True)
 
-    # ── 4 Stat cards ──────────────────────────────────────────────────────
-    avg_color = "green" if (total and avg_sc >= 75) else "amber" if (total and avg_sc >= 50) else ("red" if (total and avg_sc < 50) else "")
-    avg_disp  = str(avg_sc) if total else "—"
-    st.html(f"""
+    # ── 4 Stat cards (markdown = no iframe, styles always apply) ─────────
+    footer_total = f"Last: {last_str}" if last_str != "—" else "No audits yet"
+    st.markdown(f"""
     <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;'>
-      <div class='stat-card blue'>
-        <div class='stat-label'>Total audits</div>
-        <div class='stat-value'>{total}</div>
-        <div class='stat-footer'>{'Last: ' + last_str if last_str != '—' else 'No audits yet'}</div>
+
+      <div style='{CARD}border-top:3px solid #2563EB;padding:18px 20px;'>
+        <div style='font-size:11px;color:#64748B;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;'>Total audits</div>
+        <div style='font-family:Georgia,serif;font-size:34px;font-weight:400;color:#0F172A;line-height:1;'>{total}</div>
+        <div style='font-size:11px;color:#94A3B8;margin-top:8px;'>{footer_total}</div>
       </div>
-      <div class='stat-card green'>
-        <div class='stat-label'>Avg SEO score</div>
-        <div class='stat-value {avg_color}'>{avg_disp}</div>
-        <div class='stat-footer'>across all sessions</div>
+
+      <div style='{CARD}border-top:3px solid #059669;padding:18px 20px;'>
+        <div style='font-size:11px;color:#64748B;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;'>Avg SEO score</div>
+        <div style='font-family:Georgia,serif;font-size:34px;font-weight:400;color:{avg_col};line-height:1;'>{avg_disp}</div>
+        <div style='font-size:11px;color:#94A3B8;margin-top:8px;'>across all sessions</div>
       </div>
-      <div class='stat-card amber'>
-        <div class='stat-label'>Warnings</div>
-        <div class='stat-value amber'>{warn_iss}</div>
-        <div class='stat-footer'>across {total} URL{'s' if total != 1 else ''}</div>
+
+      <div style='{CARD}border-top:3px solid #D97706;padding:18px 20px;'>
+        <div style='font-size:11px;color:#64748B;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;'>Warnings</div>
+        <div style='font-family:Georgia,serif;font-size:34px;font-weight:400;color:#D97706;line-height:1;'>{warn_iss}</div>
+        <div style='font-size:11px;color:#94A3B8;margin-top:8px;'>across {total} URL{'s' if total != 1 else ''}</div>
       </div>
-      <div class='stat-card red'>
-        <div class='stat-label'>Critical issues</div>
-        <div class='stat-value red'>{crit_iss}</div>
-        <div class='stat-footer'>need attention</div>
+
+      <div style='{CARD}border-top:3px solid #DC2626;padding:18px 20px;'>
+        <div style='font-size:11px;color:#64748B;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;'>Critical issues</div>
+        <div style='font-family:Georgia,serif;font-size:34px;font-weight:400;color:#DC2626;line-height:1;'>{crit_iss}</div>
+        <div style='font-size:11px;color:#94A3B8;margin-top:8px;'>need attention</div>
       </div>
+
     </div>
-    """)
+    """, unsafe_allow_html=True)
 
     # ── Two-column layout ─────────────────────────────────────────────────
     col_left, col_right = st.columns([3, 2])
@@ -1327,130 +1346,103 @@ def page_dashboard():
     with col_left:
         # Recent audits card
         if not results:
-            st.html("""
-            <div class='seo-card'>
-              <div class='seo-card-head'><h3>Recent audits</h3></div>
-              <div style='padding:40px 24px;text-align:center;'>
-                <div style='font-size:2.5rem;margin-bottom:12px'>🚀</div>
-                <div style='font-size:14px;font-weight:500;color:#0F172A;margin-bottom:6px'>Run your first SEO audit</div>
-                <div style='font-size:12px;color:#64748B;max-width:360px;margin:0 auto 16px;line-height:1.6;'>
-                  Paste a URL in <b>New Audit</b> to get a full technical report — metadata, headings, images, links, PageSpeed, and more.</div>
-                <div style='display:flex;gap:12px;justify-content:center;font-size:11px;color:#94A3B8;flex-wrap:wrap;'>
+            st.markdown(f"""
+            <div style='{CARD}'>
+              <div style='{HEAD}'><h3 style='{H3}'>Recent audits</h3></div>
+              <div style='padding:48px 24px;text-align:center;'>
+                <div style='font-size:2.2rem;margin-bottom:14px;'>🚀</div>
+                <div style='font-size:14px;font-weight:600;color:#0F172A;margin-bottom:8px;'>Run your first SEO audit</div>
+                <div style='font-size:12px;color:#64748B;max-width:340px;margin:0 auto 18px;line-height:1.7;'>
+                  Paste a URL in <b>New Audit</b> to get a full technical report —
+                  metadata, headings, images, links, PageSpeed, and more.</div>
+                <div style='display:flex;gap:14px;justify-content:center;font-size:11px;color:#94A3B8;flex-wrap:wrap;'>
                   <span>📋 Single URL audit</span>
                   <span>📂 Bulk CSV / XLSX</span>
-                  <span>🗺️ Sitemap XML import</span>
+                  <span>🗺️ Sitemap XML</span>
                 </div>
               </div>
             </div>
-            """)
+            """, unsafe_allow_html=True)
         else:
-            def _circle_cls(s):
-                return "a" if s >= 75 else "b" if s >= 50 else "c"
+            def _circle(s):
+                if s >= 75: bg, col, bdr = "#D1FAE5","#065F46","#6EE7B7"
+                elif s >= 50: bg, col, bdr = "#FEF3C7","#78350F","#FDE68A"
+                else: bg, col, bdr = "#FEE2E2","#7F1D1D","#FECACA"
+                return f"<div style='width:38px;height:38px;border-radius:50%;background:{bg};border:1.5px solid {bdr};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:Georgia,serif;font-size:12px;font-weight:400;color:{col};'>{s}</div>"
+
             def _tag(s):
-                if s >= 75: return "<span class='seo-tag g'>✓ Pass</span>"
-                if s >= 50: return "<span class='seo-tag w'>Fair</span>"
-                return "<span class='seo-tag r'>Poor</span>"
+                if s >= 75: return "<span style='font-size:11px;padding:3px 10px;border-radius:20px;background:#D1FAE5;color:#166534;white-space:nowrap;'>✓ Pass</span>"
+                if s >= 50: return "<span style='font-size:11px;padding:3px 10px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap;'>Fair</span>"
+                return "<span style='font-size:11px;padding:3px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B;white-space:nowrap;'>Poor</span>"
 
             rows_html = ""
             for r in results[-8:][::-1]:
-                sc   = r.get("seo_score", 0)
-                url  = _hesc.escape(r.get("url", ""))
-                disp = url.replace("https://","").replace("http://","")[:55]
-                atype = r.get("audit_type","general").title()
+                sc      = r.get("seo_score", 0)
+                url     = _hesc.escape(r.get("url", ""))
+                disp    = url.replace("https://","").replace("http://","")[:52]
+                atype   = r.get("audit_type","general").title()
                 nissues = len(r.get("all_issues", []))
                 rows_html += f"""
-                <div class='audit-row'>
-                  <div class='score-circle {_circle_cls(sc)}'>{sc}</div>
+                <div style='display:flex;align-items:center;padding:10px 16px;gap:12px;
+                border-bottom:1px solid #F8FAFC;'>
+                  {_circle(sc)}
                   <div style='flex:1;min-width:0;'>
-                    <div class='audit-row-url'>{disp}</div>
-                    <div class='audit-row-meta'>{atype} · {nissues} issue{'s' if nissues != 1 else ''}</div>
+                    <div style='font-size:12px;font-weight:500;color:#0F172A;
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{disp}</div>
+                    <div style='font-size:11px;color:#94A3B8;margin-top:2px;'>{atype} · {nissues} issue{'s' if nissues != 1 else ''}</div>
                   </div>
                   {_tag(sc)}
                 </div>"""
 
-            st.html(f"""
-            <div class='seo-card'>
-              <div class='seo-card-head'>
-                <h3>Recent audits</h3>
-                <span>{total} total</span>
+            st.markdown(f"""
+            <div style='{CARD}'>
+              <div style='{HEAD}'>
+                <h3 style='{H3}'>Recent audits</h3>
+                <span style='font-size:11px;color:#94A3B8;'>{total} total</span>
               </div>
               {rows_html}
             </div>
-            """)
+            """, unsafe_allow_html=True)
 
     with col_right:
         # Score distribution
-        def _bar(pct, color):
-            return f"<div style='flex:1;height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;'><div style='width:{pct}%;height:100%;background:{color};border-radius:3px;'></div></div>"
-
         p90 = round(s90 / dist_max * 100)
         p70 = round(s70 / dist_max * 100)
         p50 = round(s50 / dist_max * 100)
         plo = round(slo / dist_max * 100)
 
-        st.html(f"""
-        <div class='seo-card' style='margin-bottom:12px;'>
-          <div class='seo-card-head'><h3>Score distribution</h3></div>
-          <div class='seo-card-body'>
-            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#059669;'>90–100</span>{_bar(p90,'#059669')}<span class='dist-bar-num'>{s90}</span></div>
-            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#2563EB;'>70–89</span>{_bar(p70,'#2563EB')}<span class='dist-bar-num'>{s70}</span></div>
-            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#D97706;'>50–69</span>{_bar(p50,'#D97706')}<span class='dist-bar-num'>{s50}</span></div>
-            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#DC2626;'>Below 50</span>{_bar(plo,'#DC2626')}<span class='dist-bar-num'>{slo}</span></div>
+        st.markdown(f"""
+        <div style='{CARD}'>
+          <div style='{HEAD}'><h3 style='{H3}'>Score distribution</h3></div>
+          <div style='{BODY}'>
+            {_bar_row("90–100","#059669","#059669","#ECFDF5",p90,s90)}
+            {_bar_row("70–89","#2563EB","#2563EB","#EFF6FF",p70,s70)}
+            {_bar_row("50–69","#D97706","#D97706","#FFFBEB",p50,s50)}
+            {_bar_row("Below 50","#DC2626","#DC2626","#FEF2F2",plo,slo)}
           </div>
         </div>
-        """)
+        """, unsafe_allow_html=True)
 
-        # Issue summary
-        high_iss = sum(1 for i in all_issues if i.get("severity","").lower() == "high")
-        st.html(f"""
-        <div class='seo-card'>
-          <div class='seo-card-head'><h3>Issue summary</h3></div>
-          <div class='seo-card-body'>
-            <div class='dist-bar-row'>
-              <span class='dist-bar-lbl' style='color:#DC2626;'>Critical</span>
-              <div style='flex:1;height:6px;background:#FEF2F2;border-radius:3px;overflow:hidden;'>
-                <div style='width:{min(crit_iss*8,100)}%;height:100%;background:#DC2626;border-radius:3px;'></div>
-              </div>
-              <span class='dist-bar-num'>{crit_iss}</span>
-            </div>
-            <div class='dist-bar-row'>
-              <span class='dist-bar-lbl' style='color:#D97706;'>High</span>
-              <div style='flex:1;height:6px;background:#FFFBEB;border-radius:3px;overflow:hidden;'>
-                <div style='width:{min(high_iss*6,100)}%;height:100%;background:#D97706;border-radius:3px;'></div>
-              </div>
-              <span class='dist-bar-num'>{high_iss}</span>
-            </div>
-            <div class='dist-bar-row'>
-              <span class='dist-bar-lbl' style='color:#2563EB;'>Warnings</span>
-              <div style='flex:1;height:6px;background:#EFF6FF;border-radius:3px;overflow:hidden;'>
-                <div style='width:{min(warn_iss*3,100)}%;height:100%;background:#2563EB;border-radius:3px;'></div>
-              </div>
-              <span class='dist-bar-num'>{warn_iss}</span>
+        # Quick audit card
+        st.markdown(f"""
+        <div style='{CARD}'>
+          <div style='{HEAD}'><h3 style='{H3}'>Run a quick audit</h3></div>
+          <div style='{BODY}'>
+            <div style='background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
+            padding:10px 13px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:8px;'>
+              🌐 Paste a URL to audit…
             </div>
           </div>
         </div>
-        """)
+        """, unsafe_allow_html=True)
+        if st.button("🔍 Open audit form", key="dash_open_audit", use_container_width=True):
+            st.session_state["nav_page"] = "🚀 New Audit"
+            st.rerun()
 
         if results:
             if st.button("View all results →", key="dash_view_results", use_container_width=True):
                 st.session_state["nav_page"] = "📋 Audit Results"
                 st.rerun()
-
-        # Quick audit card — right column, below Issue summary
-        st.html("""
-        <div class='seo-card' style='margin-top:0;'>
-          <div class='seo-card-head'><h3>Run a quick audit</h3></div>
-          <div style='padding:14px 16px;'>
-            <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
-            padding:9px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:8px;'>
-              🌐 Paste a URL to audit…
-            </div>
-          </div>
-        </div>
-        """)
-        if st.button("🔍 Open audit form", key="dash_open_audit", use_container_width=True):
-            st.session_state["nav_page"] = "🚀 New Audit"
-            st.rerun()
 
     if not results:
         return
