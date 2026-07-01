@@ -1259,360 +1259,200 @@ def render_inline_result(r):
 # ════════════════════════════════════════════════════════════════════════════
 
 def page_dashboard():
+    import html as _hesc
     results  = st.session_state.audit_results
     last_date= st.session_state.last_audit_date
 
-    st.html("<div class='page-header'><h2>Overview</h2><p>Audit health at a glance — scores, issues, and recent activity</p></div>")
+    # ── Compute stats (safe even with no data) ────────────────────────────
+    total      = len(results)
+    scores     = [r.get("seo_score", 0) for r in results]
+    avg_sc     = round(sum(scores) / total, 1) if total else 0
+    all_issues = [i for r in results for i in r.get("all_issues", [])]
+    warn_iss   = sum(1 for i in all_issues if i.get("severity","").lower() in ("warning","medium","high"))
+    crit_iss   = sum(1 for i in all_issues if i.get("severity","").lower() == "critical")
+    s90        = sum(1 for s in scores if s >= 90)
+    s70        = sum(1 for s in scores if 70 <= s < 90)
+    s50        = sum(1 for s in scores if 50 <= s < 70)
+    slo        = sum(1 for s in scores if s < 50)
+    dist_max   = max(s90, s70, s50, slo, 1)
 
-    c1, c2 = st.columns(2)
-    with c1: st.caption(f"**Last Audit:** {last_date}" if last_date else "No audit run yet")
-    with c2: st.caption(f"**Total URLs Audited:** {len(results)}")
+    last_str = last_date or "—"
 
-    if not results:
-        st.markdown("""
-        <div style='background:var(--seo-card-bg,#fff);border:1.5px dashed var(--seo-border,rgba(148,163,184,.4));
-        border-radius:14px;padding:40px 32px;text-align:center;margin:24px 0'>
-          <div style='font-size:2.8rem;margin-bottom:12px'>🚀</div>
-          <div style='font-size:1.25rem;font-weight:700;color:var(--seo-heading,#0F172A);margin-bottom:8px'>
-            Run your first SEO audit</div>
-          <div style='color:var(--seo-muted,#64748B);font-size:.92rem;max-width:480px;margin:0 auto 20px'>
-            Paste a URL in <b>New Audit</b> to get a full technical SEO report — metadata, headings,
-            images, links, PageSpeed, mobile readiness, and more.</div>
-          <div style='display:flex;gap:16px;justify-content:center;flex-wrap:wrap;font-size:.82rem;color:var(--seo-muted,#64748B)'>
-            <span>📋 Single URL audit</span>
-            <span>📂 Bulk CSV / XLSX upload</span>
-            <span>🗺️ Sitemap XML import</span>
+    # ── Top bar ───────────────────────────────────────────────────────────
+    st.html("""
+    <div style='background:#fff;border-bottom:0.5px solid #E2E8F0;padding:10px 0 10px;
+    display:flex;align-items:center;gap:10px;margin-bottom:20px;border-radius:10px;padding:10px 16px;'>
+      <span style='font-size:13px;color:#94A3B8;'>🏠</span>
+      <span style='font-size:12px;color:#94A3B8;'>›</span>
+      <span style='font-size:13px;font-weight:500;color:#0F172A;'>Overview</span>
+      <div style='flex:1'></div>
+      <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
+      padding:6px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:6px;'>
+        🔍 Search audits…
+      </div>
+    </div>
+    """)
+
+    # ── 4 Stat cards ──────────────────────────────────────────────────────
+    avg_color = "green" if avg_sc >= 75 else "amber" if avg_sc >= 50 else "red"
+    st.html(f"""
+    <div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;'>
+      <div class='stat-card blue'>
+        <div class='stat-label'>Total audits</div>
+        <div class='stat-value'>{total}</div>
+        <div class='stat-footer'>{'Last: ' + last_str if last_str != '—' else 'No audits yet'}</div>
+      </div>
+      <div class='stat-card green'>
+        <div class='stat-label'>Avg SEO score</div>
+        <div class='stat-value {avg_color}'>{avg_sc if total else '—'}</div>
+        <div class='stat-footer'>across all sessions</div>
+      </div>
+      <div class='stat-card amber'>
+        <div class='stat-label'>Warnings</div>
+        <div class='stat-value amber'>{warn_iss}</div>
+        <div class='stat-footer'>across {total} URL{'s' if total != 1 else ''}</div>
+      </div>
+      <div class='stat-card red'>
+        <div class='stat-label'>Critical issues</div>
+        <div class='stat-value red'>{crit_iss}</div>
+        <div class='stat-footer'>need attention</div>
+      </div>
+    </div>
+    """)
+
+    # ── Two-column layout ─────────────────────────────────────────────────
+    col_left, col_right = st.columns([3, 2])
+
+    with col_left:
+        # Recent audits card
+        if not results:
+            st.html("""
+            <div class='seo-card'>
+              <div class='seo-card-head'><h3>Recent audits</h3></div>
+              <div style='padding:40px 24px;text-align:center;'>
+                <div style='font-size:2.5rem;margin-bottom:12px'>🚀</div>
+                <div style='font-size:14px;font-weight:500;color:#0F172A;margin-bottom:6px'>Run your first SEO audit</div>
+                <div style='font-size:12px;color:#64748B;max-width:360px;margin:0 auto 16px;line-height:1.6;'>
+                  Paste a URL in <b>New Audit</b> to get a full technical report — metadata, headings, images, links, PageSpeed, and more.</div>
+                <div style='display:flex;gap:12px;justify-content:center;font-size:11px;color:#94A3B8;flex-wrap:wrap;'>
+                  <span>📋 Single URL audit</span>
+                  <span>📂 Bulk CSV / XLSX</span>
+                  <span>🗺️ Sitemap XML import</span>
+                </div>
+              </div>
+            </div>
+            """)
+        else:
+            def _circle_cls(s):
+                return "a" if s >= 75 else "b" if s >= 50 else "c"
+            def _tag(s):
+                if s >= 75: return "<span class='seo-tag g'>✓ Pass</span>"
+                if s >= 50: return "<span class='seo-tag w'>Fair</span>"
+                return "<span class='seo-tag r'>Poor</span>"
+
+            rows_html = ""
+            for r in results[-8:][::-1]:
+                sc   = r.get("seo_score", 0)
+                url  = _hesc.escape(r.get("url", ""))
+                disp = url.replace("https://","").replace("http://","")[:55]
+                atype = r.get("audit_type","general").title()
+                nissues = len(r.get("all_issues", []))
+                rows_html += f"""
+                <div class='audit-row'>
+                  <div class='score-circle {_circle_cls(sc)}'>{sc}</div>
+                  <div style='flex:1;min-width:0;'>
+                    <div class='audit-row-url'>{disp}</div>
+                    <div class='audit-row-meta'>{atype} · {nissues} issue{'s' if nissues != 1 else ''}</div>
+                  </div>
+                  {_tag(sc)}
+                </div>"""
+
+            st.html(f"""
+            <div class='seo-card'>
+              <div class='seo-card-head'>
+                <h3>Recent audits</h3>
+                <span>{total} total</span>
+              </div>
+              {rows_html}
+            </div>
+            """)
+
+        # Quick audit input + navigate button
+        st.html("""
+        <div class='seo-card' style='margin-top:0;'>
+          <div class='seo-card-head'><h3>Run a quick audit</h3></div>
+          <div class='seo-card-body' style='padding:14px 16px;'>
+            <div style='background:#F8FAFC;border:0.5px solid #E2E8F0;border-radius:7px;
+            padding:9px 12px;font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:8px;'>
+              🌐 Paste a URL to audit…
+            </div>
           </div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
+        if st.button("🔍 Open audit form", key="dash_open_audit", use_container_width=True):
+            st.session_state["nav_page"] = "🚀 New Audit"
+            st.rerun()
+
+    with col_right:
+        # Score distribution
+        def _bar(pct, color):
+            return f"<div style='flex:1;height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;'><div style='width:{pct}%;height:100%;background:{color};border-radius:3px;'></div></div>"
+
+        p90 = round(s90 / dist_max * 100)
+        p70 = round(s70 / dist_max * 100)
+        p50 = round(s50 / dist_max * 100)
+        plo = round(slo / dist_max * 100)
+
+        st.html(f"""
+        <div class='seo-card' style='margin-bottom:12px;'>
+          <div class='seo-card-head'><h3>Score distribution</h3></div>
+          <div class='seo-card-body'>
+            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#059669;'>90–100</span>{_bar(p90,'#059669')}<span class='dist-bar-num'>{s90}</span></div>
+            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#2563EB;'>70–89</span>{_bar(p70,'#2563EB')}<span class='dist-bar-num'>{s70}</span></div>
+            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#D97706;'>50–69</span>{_bar(p50,'#D97706')}<span class='dist-bar-num'>{s50}</span></div>
+            <div class='dist-bar-row'><span class='dist-bar-lbl' style='color:#DC2626;'>Below 50</span>{_bar(plo,'#DC2626')}<span class='dist-bar-num'>{slo}</span></div>
+          </div>
+        </div>
+        """)
+
+        # Issue summary
+        high_iss = sum(1 for i in all_issues if i.get("severity","").lower() == "high")
+        st.html(f"""
+        <div class='seo-card'>
+          <div class='seo-card-head'><h3>Issue summary</h3></div>
+          <div class='seo-card-body'>
+            <div class='dist-bar-row'>
+              <span class='dist-bar-lbl' style='color:#DC2626;'>Critical</span>
+              <div style='flex:1;height:6px;background:#FEF2F2;border-radius:3px;overflow:hidden;'>
+                <div style='width:{min(crit_iss*8,100)}%;height:100%;background:#DC2626;border-radius:3px;'></div>
+              </div>
+              <span class='dist-bar-num'>{crit_iss}</span>
+            </div>
+            <div class='dist-bar-row'>
+              <span class='dist-bar-lbl' style='color:#D97706;'>High</span>
+              <div style='flex:1;height:6px;background:#FFFBEB;border-radius:3px;overflow:hidden;'>
+                <div style='width:{min(high_iss*6,100)}%;height:100%;background:#D97706;border-radius:3px;'></div>
+              </div>
+              <span class='dist-bar-num'>{high_iss}</span>
+            </div>
+            <div class='dist-bar-row'>
+              <span class='dist-bar-lbl' style='color:#2563EB;'>Warnings</span>
+              <div style='flex:1;height:6px;background:#EFF6FF;border-radius:3px;overflow:hidden;'>
+                <div style='width:{min(warn_iss*3,100)}%;height:100%;background:#2563EB;border-radius:3px;'></div>
+              </div>
+              <span class='dist-bar-num'>{warn_iss}</span>
+            </div>
+          </div>
+        </div>
+        """)
+
+        if results:
+            if st.button("View all results →", key="dash_view_results", use_container_width=True):
+                st.session_state["nav_page"] = "📋 Audit Results"
+                st.rerun()
+
+    if not results:
         return
-
-    total  = len(results)
-    scores = [r.get("seo_score",0) for r in results]
-    avg_sc = round(sum(scores)/total, 1)
-    healthy= sum(1 for s in scores if s >= 75)
-    crit_u = sum(1 for s in scores if s < 50)
-    warn_u = sum(1 for s in scores if 50 <= s < 75)
-    all_issues = [i for r in results for i in r.get("all_issues",[])]
-    crit_iss   = sum(1 for i in all_issues if i.get("severity")=="Critical")
-    broken_lnk = (sum(r.get("internal_links",{}).get("broken_count",0) or 0 for r in results) +
-                  sum(r.get("external_links",{}).get("broken_count",0) or 0 for r in results))
-    miss_meta  = sum(1 for r in results
-                     if not r.get("metadata",{}).get("has_title") or
-                        not r.get("metadata",{}).get("has_description"))
-    no_viewport= sum(1 for r in results if not r.get("advanced",{}).get("has_viewport",True))
-    no_schema  = sum(1 for r in results if not r.get("advanced",{}).get("has_schema",True))
-    avg_wc     = round(sum(r.get("content",{}).get("word_count",0) for r in results)/total)
-
-    # ── KPI Cards ─────────────────────────────────────────────────────────
-    st.markdown('<div class="section-header">📊 Overview</div>', unsafe_allow_html=True)
-    r1 = st.columns(4)
-    r2 = st.columns(4)
-    with r1[0]: metric_card("Total URLs",      total,           "#3B82F6", "📋 Audit Results",  None)
-    with r1[1]: metric_card("Healthy URLs",    healthy,         "#10B981", "📋 Audit Results",  "healthy_urls")
-    with r1[2]: metric_card("Critical URLs",   crit_u,          "#EF4444", "📋 Audit Results",  "critical_urls")
-    with r1[3]: metric_card("Avg SEO Score",   f"{avg_sc}/100", _score_color(avg_sc), "📋 Audit Results", None)
-    with r2[0]: metric_card("Critical Issues", crit_iss,        "#EF4444", "📋 Audit Results",  "critical_issues")
-    with r2[1]: metric_card("Broken Links",    broken_lnk,      "#F97316", "🔗 Link Analysis",  "broken_links")
-    with r2[2]: metric_card("No Viewport",     no_viewport,     "#8B5CF6", "📋 Audit Results",  "no_viewport")
-    with r2[3]: metric_card("No Schema",       no_schema,       "#06B6D4", "📋 Audit Results",  "no_schema")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── SEMrush-style Issues Summary + Site Health Gauge ─────────────────
-    warn_iss  = sum(1 for i in all_issues if i.get("severity") in ("Warning","Medium"))
-    notice_iss= sum(1 for i in all_issues if i.get("severity") == "Low")
-    high_iss  = sum(1 for i in all_issues if i.get("severity") == "High")
-    errors_total = crit_iss + high_iss
-    health_pct   = max(0, min(100, round(100 - (errors_total * 4 + warn_iss * 2 + notice_iss * 0.5) / max(total,1))))
-
-    hp1, hp2 = st.columns([2, 1])
-    with hp1:
-        st.markdown('<div class="section-header">🏥 Site Health Overview</div>', unsafe_allow_html=True)
-        e1, e2, e3, e4 = st.columns(4)
-        with e1:
-            st.markdown(f"""
-            <div style='background:var(--sev-critical-bg,rgba(239,68,68,.10));border-radius:10px;
-                 padding:14px 16px;text-align:center;border:1px solid rgba(239,68,68,.2)'>
-                <div style='font-size:2rem;font-weight:800;color:#EF4444'>{crit_iss}</div>
-                <div style='font-size:.75rem;font-weight:700;color:#EF4444;margin-top:2px'>ERRORS</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Critical issues</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button("View Errors →", key="nav_errs", use_container_width=True, help="View all Critical issues"):
-                st.session_state["nav_page"] = "📋 Audit Results"
-                st.session_state["nav_filter"] = "critical_issues"
-                st.rerun()
-        with e2:
-            st.markdown(f"""
-            <div style='background:var(--sev-high-bg,rgba(249,115,22,.10));border-radius:10px;
-                 padding:14px 16px;text-align:center;border:1px solid rgba(249,115,22,.2)'>
-                <div style='font-size:2rem;font-weight:800;color:#F97316'>{high_iss}</div>
-                <div style='font-size:.75rem;font-weight:700;color:#F97316;margin-top:2px'>HIGH</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>High priority</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button("View High →", key="nav_high", use_container_width=True, help="View High priority issues"):
-                st.session_state["nav_page"] = "📋 Audit Results"
-                st.session_state["nav_filter"] = "high_issues"
-                st.rerun()
-        with e3:
-            st.markdown(f"""
-            <div style='background:var(--sev-warning-bg,rgba(245,158,11,.10));border-radius:10px;
-                 padding:14px 16px;text-align:center;border:1px solid rgba(245,158,11,.2)'>
-                <div style='font-size:2rem;font-weight:800;color:#F59E0B'>{warn_iss}</div>
-                <div style='font-size:.75rem;font-weight:700;color:#F59E0B;margin-top:2px'>WARNINGS</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Medium priority</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button("View Warnings →", key="nav_warn", use_container_width=True, help="View Warning issues"):
-                st.session_state["nav_page"] = "📋 Audit Results"
-                st.session_state["nav_filter"] = "warnings"
-                st.rerun()
-        with e4:
-            st.markdown(f"""
-            <div style='background:var(--sev-low-bg,rgba(59,130,246,.10));border-radius:10px;
-                 padding:14px 16px;text-align:center;border:1px solid rgba(59,130,246,.2)'>
-                <div style='font-size:2rem;font-weight:800;color:#3B82F6'>{notice_iss}</div>
-                <div style='font-size:.75rem;font-weight:700;color:#3B82F6;margin-top:2px'>NOTICES</div>
-                <div style='font-size:.68rem;color:var(--seo-muted,#64748B);margin-top:2px'>Low priority</div>
-            </div>""", unsafe_allow_html=True)
-            if st.button("View Notices →", key="nav_not", use_container_width=True, help="View Low priority notices"):
-                st.session_state["nav_page"] = "📋 Audit Results"
-                st.session_state["nav_filter"] = "notices"
-                st.rerun()
-
-    with hp2:
-        st.markdown('<div class="section-header">📊 Health Score</div>', unsafe_allow_html=True)
-        h_color = "#10B981" if health_pct >= 80 else "#F59E0B" if health_pct >= 60 else "#EF4444"
-        h_label = "Excellent" if health_pct >= 80 else "Needs Work" if health_pct >= 60 else "Critical"
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=health_pct,
-            number={"suffix": "%", "font": {"size": 32, "color": h_color}},
-            gauge={
-                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "gray"},
-                "bar": {"color": h_color, "thickness": 0.28},
-                "steps": [
-                    {"range": [0, 50],  "color": "rgba(239,68,68,.12)"},
-                    {"range": [50, 75], "color": "rgba(245,158,11,.12)"},
-                    {"range": [75, 100],"color": "rgba(16,185,129,.12)"},
-                ],
-                "threshold": {"line": {"color": h_color, "width": 3}, "value": health_pct},
-            },
-        ))
-        fig_gauge.update_layout(
-            height=200, margin=dict(t=20, b=10, l=20, r=20),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font_color="gray",
-            annotations=[{"text": h_label, "x": 0.5, "y": 0.15, "showarrow": False,
-                           "font": {"size": 13, "color": h_color}}],
-        )
-        st.plotly_chart(fig_gauge, use_container_width=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Crawlability Status ───────────────────────────────────────────────
-    idx_count  = sum(1 for r in results if r.get("indexability",{}).get("is_indexable", True))
-    noindex_c  = total - idx_count
-    redirect_c = sum(1 for r in results if r.get("redirect_count",0) > 0)
-    amp_c      = sum(1 for r in results if r.get("technical_seo",{}).get("has_amp",False))
-    paginated  = sum(1 for r in results if r.get("technical_seo",{}).get("has_pagination",False))
-    schema_c   = sum(1 for r in results if r.get("advanced",{}).get("has_schema",False))
-
-    st.markdown('<div class="section-header">🕷️ Crawlability & Indexability</div>', unsafe_allow_html=True)
-    cr1, cr2, cr3, cr4, cr5 = st.columns(5)
-    _cw_items = [
-        (cr1, "✅ Indexable",    idx_count,  "#10B981", None),
-        (cr2, "🚫 Noindex",      noindex_c,  "#EF4444", "noindex"),
-        (cr3, "↪️ Has Redirect",  redirect_c, "#F97316", "has_redirect"),
-        (cr4, "📋 Has Schema",   schema_c,   "#3B82F6", None),
-        (cr5, "📄 AMP Pages",    amp_c,      "#8B5CF6", None),
-    ]
-    for col, lbl, cnt, clr, flt in _cw_items:
-        with col:
-            st.markdown(f"""
-            <div style='background:var(--seo-card-bg,#F8FAFC);border:1px solid var(--seo-border,rgba(148,163,184,.22));
-                 border-radius:10px;padding:12px 10px;text-align:center'>
-                <div style='font-size:1.5rem;font-weight:800;color:{clr}'>{cnt}</div>
-                <div style='font-size:.72rem;color:var(--seo-muted,#64748B);margin-top:2px'>{lbl}</div>
-            </div>""", unsafe_allow_html=True)
-            _cw_key = f"nav_cw_{lbl[:5].strip().replace(' ','_')}"
-            if st.button("View →", key=_cw_key, use_container_width=True, help=f"View {lbl} URLs"):
-                st.session_state["nav_page"]   = "📋 Audit Results"
-                st.session_state["nav_filter"] = flt
-                st.rerun()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Quick Wins (high impact + low effort) ─────────────────────────────
-    quick_wins = sorted(
-        [i for i in all_issues if i.get("effort","") == "Low" and i.get("impact_score",0) >= 7],
-        key=lambda x: x.get("impact_score", 0), reverse=True
-    )[:6]
-    if quick_wins:
-        st.markdown('<div class="section-header">⚡ Quick Wins — High Impact, Low Effort</div>',
-                    unsafe_allow_html=True)
-        st.caption("Fix these first — maximum SEO gain for minimum time investment.")
-        qw_cols = st.columns(2)
-        for idx_qw, qw in enumerate(quick_wins):
-            sev   = qw.get("severity","Low")
-            imp   = qw.get("impact_score",0)
-            sev_c = _SEV_COLORS.get(sev,"#6B7280")
-            with qw_cols[idx_qw % 2]:
-                st.markdown(f"""
-                <div class='qw-card'>
-                    <div class='qw-number'>{idx_qw+1}</div>
-                    <div class='qw-text'>
-                        <div class='qw-title'>{qw.get("issue","")}</div>
-                        <div class='qw-sub'>
-                            <span style='color:{sev_c};font-weight:700'>{sev}</span>
-                            &nbsp;·&nbsp; Impact: <b>{imp}/10</b>
-                            &nbsp;·&nbsp; <span style='color:#10B981;font-weight:600'>Low Effort</span>
-                        </div>
-                        <div style='font-size:.75rem;color:var(--seo-info-text,#1D4ED8);margin-top:4px'>
-                            ✅ {qw.get("recommendation","")}
-                        </div>
-                    </div>
-                </div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Duplicate Meta Detection ──────────────────────────────────────────
-    if len(results) > 1:
-        from modules.advanced_checks import detect_duplicate_metas
-        dup = detect_duplicate_metas(results)
-        st.session_state.dup_report = dup
-        dt = dup.get("total_dup_titles",0)
-        dd = dup.get("total_dup_descs",0)
-        dh = dup.get("total_dup_h1s",0)
-        if dt + dd + dh > 0:
-            st.markdown('<div class="section-header">⚠️ Duplicate Content Alerts</div>',
-                        unsafe_allow_html=True)
-            da1, da2, da3 = st.columns(3)
-            with da1:
-                if dt:
-                    st.error(f"🔴 **{dt}** duplicate meta title(s)")
-            with da2:
-                if dd:
-                    st.warning(f"⚠️ **{dd}** duplicate meta description(s)")
-            with da3:
-                if dh:
-                    st.warning(f"⚠️ **{dh}** duplicate H1(s)")
-
-            with st.expander("View Duplicate Details"):
-                if dup.get("duplicate_titles"):
-                    st.markdown("**Duplicate Meta Titles:**")
-                    for t, urls in list(dup["duplicate_titles"].items())[:5]:
-                        st.markdown(f"- `{t[:80]}` → {len(urls)} pages")
-                        for u in urls[:3]:
-                            st.caption(f"  • {u}")
-                if dup.get("duplicate_descriptions"):
-                    st.markdown("**Duplicate Meta Descriptions:**")
-                    for d, urls in list(dup["duplicate_descriptions"].items())[:5]:
-                        st.markdown(f"- `{d[:80]}` → {len(urls)} pages")
-            st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Charts ────────────────────────────────────────────────────────────
-    st.markdown('<div class="section-header">📈 Analytics</div>', unsafe_allow_html=True)
-    ch1, ch2 = st.columns(2)
-
-    with ch1:
-        dist = {
-            "Excellent (90-100)":    sum(1 for s in scores if s >= 90),
-            "Good (75-89)":          sum(1 for s in scores if 75 <= s < 90),
-            "Needs Attention (50-74)": sum(1 for s in scores if 50 <= s < 75),
-            "Critical (<50)":        sum(1 for s in scores if s < 50),
-        }
-        fig = px.pie(names=list(dist.keys()), values=list(dist.values()),
-                     color_discrete_sequence=["#10B981","#3B82F6","#F59E0B","#EF4444"],
-                     title="SEO Health Distribution")
-        fig.update_layout(margin=dict(t=40,b=10,l=10,r=10), height=320)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with ch2:
-        sev_counts = {}
-        for i in all_issues:
-            s = i.get("severity","Other")
-            sev_counts[s] = sev_counts.get(s,0) + 1
-        fig2 = px.bar(x=list(sev_counts.keys()), y=list(sev_counts.values()),
-                      color=list(sev_counts.keys()),
-                      color_discrete_map={"Critical":"#EF4444","High":"#F97316",
-                                          "Medium":"#EAB308","Warning":"#F59E0B","Low":"#3B82F6"},
-                      title="Issue Severity Breakdown",
-                      labels={"x":"Severity","y":"Count"})
-        fig2.update_layout(showlegend=False, margin=dict(t=40,b=10,l=10,r=10), height=320)
-        st.plotly_chart(fig2, use_container_width=True)
-
-    ch3, ch4 = st.columns(2)
-    with ch3:
-        # Top Issues by Impact across all results
-        from modules.scoring import get_top_issues_by_impact
-        top_global = get_top_issues_by_impact(all_issues, 10)
-        if top_global:
-            top_df = pd.DataFrame([{
-                "Issue": i.get("issue","")[:55],
-                "Impact": i.get("impact_score",0),
-                "Severity": i.get("severity","Low"),
-            } for i in top_global])
-            fig3 = px.bar(top_df, x="Impact", y="Issue", orientation="h",
-                          color="Severity",
-                          color_discrete_map={"Critical":"#EF4444","High":"#F97316",
-                                              "Medium":"#EAB308","Warning":"#F59E0B","Low":"#3B82F6"},
-                          title="Top 10 Issues by Impact Score")
-            fig3.update_layout(showlegend=True, height=360, margin=dict(t=40,b=10,l=10,r=10))
-            st.plotly_chart(fig3, use_container_width=True)
-
-    with ch4:
-        # Thematic grouping
-        from modules.scoring import THEMES
-        theme_counts = {}
-        for iss in all_issues:
-            cat = iss.get("category","")
-            placed = False
-            for theme, cats in THEMES.items():
-                if any(c.lower() in cat.lower() for c in cats):
-                    theme_counts[theme] = theme_counts.get(theme,0) + 1
-                    placed = True
-                    break
-            if not placed:
-                theme_counts["Other"] = theme_counts.get("Other",0) + 1
-        if theme_counts:
-            fig4 = px.bar(x=list(theme_counts.values()), y=list(theme_counts.keys()),
-                          orientation="h", title="Issues by SEO Theme (SEMrush-style)",
-                          color=list(theme_counts.values()),
-                          color_continuous_scale="OrRd")
-            fig4.update_layout(showlegend=False, height=360,
-                               margin=dict(t=40,b=10,l=10,r=10), coloraxis_showscale=False)
-            st.plotly_chart(fig4, use_container_width=True)
-
-    ch5, ch6 = st.columns(2)
-    with ch5:
-        int_t = sum(r.get("internal_links",{}).get("total_links",0) for r in results)
-        ext_t = sum(r.get("external_links",{}).get("total_links",0) for r in results)
-        fig5 = go.Figure()
-        fig5.add_trace(go.Bar(name="Internal Links", x=["Link Distribution"], y=[int_t], marker_color="#3B82F6"))
-        fig5.add_trace(go.Bar(name="External Links", x=["Link Distribution"], y=[ext_t], marker_color="#8B5CF6"))
-        fig5.update_layout(title="Internal vs External Links",
-                           margin=dict(t=40,b=10,l=10,r=10), height=300, barmode="group")
-        st.plotly_chart(fig5, use_container_width=True)
-
-    with ch6:
-        if total > 1:
-            df_plot = pd.DataFrame([{
-                "URL": r.get("url","")[-50:],
-                "SEO Score": r.get("seo_score",0),
-                "Word Count": r.get("content",{}).get("word_count",0),
-                "Type": r.get("audit_type","general").title(),
-                "Issues": len(r.get("all_issues",[])),
-            } for r in results])
-            fig6 = px.scatter(df_plot, x="Word Count", y="SEO Score", color="Type",
-                              size="Issues", hover_data=["URL","Issues"],
-                              title="SEO Score vs Word Count",
-                              color_discrete_sequence=px.colors.qualitative.Set2)
-            fig6.add_hline(y=75, line_dash="dot", line_color="#3B82F6",
-                           annotation_text="Good (75)")
-            fig6.add_hline(y=50, line_dash="dot", line_color="#EF4444",
-                           annotation_text="Critical (50)")
-            fig6.update_layout(height=300, margin=dict(t=40,b=10,l=10,r=10))
-            st.plotly_chart(fig6, use_container_width=True)
-
 
 # ════════════════════════════════════════════════════════════════════════════
 # New Audit
