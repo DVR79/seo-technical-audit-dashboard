@@ -80,11 +80,11 @@ html, body, [class*="css"], .stApp {
     --seo-banner-muted:   #94A3B8;
     --seo-banner-label:   #CBD5E1;
 
-    --seo-sidebar-bg:     linear-gradient(175deg, #0D1526 0%, #111827 60%, #0F1A2E 100%);
-    --seo-sidebar-border: rgba(79,70,229,0.2);
-    --seo-sidebar-text:   #C7D2FE;
-    --seo-sidebar-heading:#EEF2FF;
-    --seo-sidebar-muted:  #6B7A99;
+    --seo-sidebar-bg:     linear-gradient(175deg, #FFFFFF 0%, #F5F3FF 60%, #EEF2FF 100%);
+    --seo-sidebar-border: rgba(79,70,229,0.15);
+    --seo-sidebar-text:   #374151;
+    --seo-sidebar-heading:#1E293B;
+    --seo-sidebar-muted:  #6B7280;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -232,22 +232,23 @@ body[data-theme="dark"],
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   SIDEBAR — always dark, gradient style
+   SIDEBAR — light theme
    ══════════════════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-    background: var(--seo-sidebar-bg, linear-gradient(175deg, #0D1526 0%, #111827 60%, #0F1A2E 100%)) !important;
-    border-right: 1px solid var(--seo-sidebar-border, rgba(79,70,229,0.2)) !important;
+    background: linear-gradient(175deg, #FFFFFF 0%, #F5F3FF 60%, #EEF2FF 100%) !important;
+    border-right: 1px solid rgba(79,70,229,0.12) !important;
+    box-shadow: 2px 0 12px rgba(79,70,229,0.06) !important;
 }
-[data-testid="stSidebar"] * { color: var(--seo-sidebar-text, #C7D2FE) !important; }
+[data-testid="stSidebar"] * { color: #374151 !important; }
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: var(--seo-sidebar-heading, #EEF2FF) !important;
+    color: #1E293B !important;
     font-weight: 700 !important;
     letter-spacing: -0.01em;
 }
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    color: var(--seo-sidebar-muted, #6B7A99) !important;
+    color: #6B7280 !important;
     font-size: .77rem;
     line-height: 1.5;
 }
@@ -259,7 +260,7 @@ body[data-theme="dark"],
     flex-direction: column !important;
 }
 [data-testid="stSidebar"] .stRadio label {
-    color: #A5B4FC !important;
+    color: #374151 !important;
     font-size: 0.875rem !important;
     font-weight: 500 !important;
     padding: 8px 12px !important;
@@ -272,17 +273,16 @@ body[data-theme="dark"],
     border: 1px solid transparent !important;
 }
 [data-testid="stSidebar"] .stRadio label:hover {
-    color: #E0E7FF !important;
-    background: rgba(129,140,248,0.10) !important;
-    border-color: rgba(129,140,248,0.15) !important;
+    color: #4F46E5 !important;
+    background: rgba(79,70,229,0.07) !important;
+    border-color: rgba(79,70,229,0.15) !important;
 }
 [data-testid="stSidebar"] .stRadio [aria-checked="true"] + label,
 [data-testid="stSidebar"] .stRadio input:checked + label {
-    color: #818CF8 !important;
-    font-weight: 600 !important;
-    background: rgba(129,140,248,0.14) !important;
-    border-color: rgba(129,140,248,0.25) !important;
-    box-shadow: 0 0 0 1px rgba(129,140,248,0.15) inset;
+    color: #4F46E5 !important;
+    font-weight: 700 !important;
+    background: rgba(79,70,229,0.10) !important;
+    border-color: rgba(79,70,229,0.22) !important;
 }
 /* Hide radio circles */
 [data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] { display: none !important; }

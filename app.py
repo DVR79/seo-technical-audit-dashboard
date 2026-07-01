@@ -4609,11 +4609,11 @@ with st.sidebar:
     <div style='padding:20px 12px 12px;text-align:center'>
         <div style='background:linear-gradient(135deg,#4F46E5,#7C3AED);width:48px;height:48px;
         border-radius:14px;display:flex;align-items:center;justify-content:center;
-        font-size:1.5rem;margin:0 auto 10px'>🔍</div>
-        <div style='font-size:1rem;font-weight:800;color:#EEF2FF;letter-spacing:-0.01em'>SEO Audit</div>
-        <div style='font-size:.7rem;color:#6B7A99;margin-top:2px;text-transform:uppercase;letter-spacing:.08em'>Enterprise Platform</div>
+        font-size:1.5rem;margin:0 auto 10px;box-shadow:0 4px 14px rgba(79,70,229,0.3)'>🔍</div>
+        <div style='font-size:1rem;font-weight:800;color:#1E293B;letter-spacing:-0.01em'>SEO Audit</div>
+        <div style='font-size:.7rem;color:#6B7280;margin-top:2px;text-transform:uppercase;letter-spacing:.08em'>Enterprise Platform</div>
     </div>
-    <div style='height:1px;background:linear-gradient(90deg,transparent,rgba(79,70,229,.3),transparent);margin:0 8px 12px'></div>
+    <div style='height:1px;background:linear-gradient(90deg,transparent,rgba(79,70,229,.2),transparent);margin:0 8px 12px'></div>
     """, unsafe_allow_html=True)
 
     # Programmatic navigation — resolve BEFORE rendering the radio
