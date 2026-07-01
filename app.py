@@ -14,8 +14,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from modules.image_auditor import _fetch_size
-from modules.api_key_manager import APIKeyManager, CATEGORIES, _API_FLAT, test_api_key
-from modules.report_generator import _score_label as _score_label
+from modules.api_key_manager import APIKeyManager, CATEGORIES, test_api_key
+from modules.report_generator import _score_label
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -1285,8 +1285,6 @@ def page_dashboard():
                         not r.get("metadata",{}).get("has_description"))
     no_viewport= sum(1 for r in results if not r.get("advanced",{}).get("has_viewport",True))
     no_schema  = sum(1 for r in results if not r.get("advanced",{}).get("has_schema",True))
-    avg_wc     = round(sum(r.get("content",{}).get("word_count",0) for r in results)/total)
-
     # ── KPI Cards ─────────────────────────────────────────────────────────
     st.markdown('<div class="section-header">📊 Overview</div>', unsafe_allow_html=True)
     r1 = st.columns(4)
@@ -1786,7 +1784,7 @@ def page_results():
     elif _nf == "critical_urls": _score_default = 0;   _sev_default = "Any"   # handled below
     elif _nf in ("critical_issues",): _sev_default = "Critical"
     elif _nf == "high_issues":   _sev_default = "High"
-    elif _nf in ("warnings","notices"): _sev_default = "Medium" if _nf == "warnings" else "Any"
+    elif _nf in ("warnings","notices"): _sev_default = "Medium" if _nf == "warnings" else "Low"
     elif _nf == "broken_links":  _broken_default = True
     if _nf:
         _label_map = {
@@ -1807,16 +1805,19 @@ def page_results():
         if col_clr.button("✕ Clear Filter", key="clr_nav_filter"):
             st.session_state["nav_filter"] = None
             st.rerun()
+        _nf_active = _nf  # save before consuming
         st.session_state["nav_filter"] = None   # consume once
+    else:
+        _nf_active = _nf
 
-    with st.expander("🔽 Filters", expanded=bool(_nf)):
+    with st.expander("🔽 Filters", expanded=bool(_nf_active)):
         fc1,fc2,fc3,fc4 = st.columns(4)
         with fc1: type_filter = st.multiselect("Page Type", df["Type"].unique().tolist(),
                                                 default=df["Type"].unique().tolist())
         with fc2: score_min = st.slider("Min SEO Score", 0, 100, _score_default)
-        with fc3: sev_filter = st.selectbox("Has Severity", ["Any","Critical","High","Medium"],
-                                             index=["Any","Critical","High","Medium"].index(_sev_default)
-                                             if _sev_default in ["Any","Critical","High","Medium"] else 0)
+        with fc3: sev_filter = st.selectbox("Has Severity", ["Any","Critical","High","Medium","Low"],
+                                             index=["Any","Critical","High","Medium","Low"].index(_sev_default)
+                                             if _sev_default in ["Any","Critical","High","Medium","Low"] else 0)
         with fc4: broken_only = st.checkbox("Has Broken Links", value=_broken_default)
 
     mask = df["Type"].isin(type_filter) & (df["SEO Score"] >= score_min)
@@ -1861,7 +1862,7 @@ def page_results():
     if st.button("Open Detail View →", type="primary"):
         idx = next((i for i,r in enumerate(results) if r.get("url")==selected_url), 0)
         st.session_state.selected_url_idx = idx
-        st.session_state.page = "URL Detail"
+        st.session_state["nav_page"] = "🔎 URL Detail"
         st.rerun()
 
     if st.session_state.get("_confirm_clear"):
@@ -3105,10 +3106,6 @@ def page_performance():
     <div><div class='page-header-title'>Performance Audit</div>
     <div class='page-header-sub'>Core Web Vitals · PageSpeed · Mobile · Page size · Security headers</div></div></div>""",
     unsafe_allow_html=True)
-    st.markdown(  # keep original blank line for indentation integrity
-        "",
-        unsafe_allow_html=True,
-    )
     tab_mobile, tab_image = st.tabs([
         "📱 Mobile Audit",
         "🖼️ Image SEO",
@@ -3281,7 +3278,7 @@ def _page_mobile_audit_body():
                 else:
                     _typed_key = st.text_input(
                         "Google API Key",
-                        value="",
+                        value=st.session_state.get(_psi_key_ss, ""),
                         type="password",
                         placeholder="Paste API key here — or save it once in ⚙️ Settings",
                         key="psi_key_input_field",
@@ -3978,10 +3975,6 @@ def page_heading_analysis():
     <div><div class='page-header-title'>Heading Structure Audit</div>
     <div class='page-header-sub'>H1–H6 hierarchy · violations · empty headings · duplicates</div></div></div>""",
     unsafe_allow_html=True)
-    st.markdown(
-        "",
-        unsafe_allow_html=True,
-    )
     results = st.session_state.audit_results
     if not results:
         _no_data_info(); return
@@ -4591,9 +4584,20 @@ def page_export():
         st.markdown("#### 📑 PDF Report")
         st.caption("Executive summary with URL table and colour-coded scores.")
         pdf_data = generate_pdf(results)
-        st.download_button("⬇️ Download PDF", data=pdf_data,
-            file_name=f"seo_audit_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mime="application/pdf", type="primary")
+        try:
+            from fpdf import FPDF  # noqa: F401
+            _pdf_available = True
+        except ImportError:
+            _pdf_available = False
+        if _pdf_available:
+            st.download_button("⬇️ Download PDF", data=pdf_data,
+                file_name=f"seo_audit_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf", type="primary")
+        else:
+            st.warning("fpdf2 library not installed — run `pip install fpdf2` to enable PDF export.")
+            st.download_button("⬇️ Download as Text (fpdf2 missing)", data=pdf_data,
+                file_name=f"seo_audit_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                mime="text/plain")
 
     st.markdown("---")
     st.markdown("#### Preview")
@@ -4621,11 +4625,6 @@ with st.sidebar:
         target = st.session_state.pop("nav_page")
         if target in _PAGES:
             st.session_state["active_page"] = target
-    # Legacy routing from old "page" key
-    if st.session_state.get("page") == "URL Detail":
-        st.session_state["active_page"] = "🔎 URL Detail"
-        del st.session_state["page"]
-
     _cur_idx = _PAGES.index(st.session_state["active_page"]) if st.session_state["active_page"] in _PAGES else 0
 
     page = st.radio(

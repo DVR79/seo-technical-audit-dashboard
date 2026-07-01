@@ -122,8 +122,8 @@ def fetch_page(url):
         return {"success": False, "error": "Request timed out (20s) — check the URL is accessible.", "status_code": 0}
     except requests.exceptions.ConnectionError:
         return {"success": False, "error": "Connection failed — verify the URL and network access.", "status_code": 0}
-    except Exception:
-        return {"success": False, "error": "An unexpected error occurred while fetching the page.", "status_code": 0}
+    except Exception as e:
+        return {"success": False, "error": f"Unexpected error: {type(e).__name__}: {e}", "status_code": 0}
 
 
 def analyze_metadata(soup, url):

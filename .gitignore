@@ -35,3 +35,14 @@ desktop.ini
 *.log
 *.tmp
 audit_cache/
+
+# Backup artefacts
+backup/
+*.zip
+
+# Developer docs
+auditlog.md
+PREPUSH_CHECKLIST.md
+
+# Dev container
+.devcontainer/
