@@ -16,6 +16,7 @@ import streamlit as st
 from modules.image_auditor import _fetch_size
 from modules.api_key_manager import APIKeyManager, CATEGORIES, _API_FLAT, test_api_key
 from modules.report_generator import _score_label as _score_label
+from modules.auditor import audit_url as _raw_audit_url, audit_urls_bulk
 
 # ── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -57,6 +58,16 @@ st.markdown("""
 })();
 </script>
 """, unsafe_allow_html=True)
+
+# ── st.html compatibility shim (requires Streamlit ≥1.31) ─────────────────
+if not hasattr(st, "html"):
+    st.html = lambda s, **kw: st.markdown(s, unsafe_allow_html=True)
+
+# ── Module-level cached audit wrapper (cache keyed by args, not function obj) ─
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_audit_url(url, atype, check_links, validate_links, fetch_pagespeed=False, psi_api_key=None):
+    return _raw_audit_url(url, atype, check_links, validate_links,
+                          fetch_pagespeed=fetch_pagespeed, psi_api_key=psi_api_key)
 
 # ── Session state ──────────────────────────────────────────────────────────
 _PAGES = [
@@ -1653,13 +1664,8 @@ def page_new_audit():
     atype_map = {"Auto-Detect":"auto","Course":"course","Blog":"blog","General":"general"}
     atype = atype_map[audit_type]
 
-    from modules.auditor import audit_url as _raw_audit_url, audit_urls_bulk
-
-    # ── Cached wrapper — same URL + same settings = same result every time ──
-    @st.cache_data(ttl=3600, show_spinner=False)
-    def audit_url(url, atype, check_links, validate_links, fetch_pagespeed=False, psi_api_key=None):
-        return _raw_audit_url(url, atype, check_links, validate_links,
-                              fetch_pagespeed=fetch_pagespeed, psi_api_key=psi_api_key)
+    # audit_url uses module-level _cached_audit_url for stable caching across reruns
+    audit_url = _cached_audit_url
 
     # ── Single URL ────────────────────────────────────────────────────────
     with tab1:
@@ -1861,7 +1867,7 @@ def page_results():
     if st.button("Open Detail View →", type="primary"):
         idx = next((i for i,r in enumerate(results) if r.get("url")==selected_url), 0)
         st.session_state.selected_url_idx = idx
-        st.session_state.page = "URL Detail"
+        st.session_state["nav_page"] = "🔎 URL Detail"
         st.rerun()
 
     if st.session_state.get("_confirm_clear"):
