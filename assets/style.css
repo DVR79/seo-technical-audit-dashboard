@@ -25,21 +25,25 @@
   --seo-info-bg:        #F0F9FF;
 }
 
-/* ── Streamlit chrome ───────────────────────────────── */
+/* ── Streamlit chrome — hardcoded to beat dark-mode override ─ */
 
+html, body,
 .stApp,
-[data-testid="stAppViewContainer"] {
-  background: var(--seo-bg) !important;
+.stApp > div,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > section,
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"],
+[data-testid="stVerticalBlock"],
+section.main > div {
+  background-color: #F1F5F9 !important;
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
 }
 
 [data-testid="stHeader"]  { display: none !important; }
 footer                    { display: none !important; }
 #MainMenu                 { display: none !important; }
-
-[data-testid="stMain"],
-[data-testid="stMainBlockContainer"] {
-  background: var(--seo-bg) !important;
-}
 
 [data-testid="block-container"] {
   padding: 1.5rem 2rem !important;
